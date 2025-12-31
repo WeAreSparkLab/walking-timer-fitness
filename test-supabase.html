@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase Connection Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #0A0B14;
+            color: #fff;
+        }
+        h1 { color: #8A2BE2; margin-bottom: 10px; }
+        h2 { color: #00EAFF; margin-top: 30px; border-bottom: 2px solid #8A2BE2; padding-bottom: 10px; }
+        .test-section {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid rgba(138,43,226,0.3);
+        }
+        .success { color: #00d98b; }
+        .error { color: #ff6b6b; }
+        .warning { color: #ffa500; }
+        .info { color: #00EAFF; }
+        pre {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            border-left: 4px solid #8A2BE2;
+        }
+        button {
+            background: linear-gradient(90deg, #8A2BE2, #00EAFF);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #results { margin-top: 20px; }
+        .checklist {
+            background: rgba(255,165,0,0.1);
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #ffa500;
+            margin-top: 20px;
+        }
+        .checklist li { margin: 10px 0; }
+        input {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            width: 100%;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; color: #00EAFF; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Supabase Connection Tester</h1>
+    <p class="info">Test your Supabase connection and database setup</p>
+
+    <div class="test-section">
+        <h2>Configuration</h2>
+        <div class="form-group">
+            <label>Supabase URL:</label>
+            <input type="text" id="supabaseUrl" value="https://aysyggpgusqxhiuankti.supabase.co" />
+        </div>
+        <div class="form-group">
+            <label>Supabase Anon Key:</label>
+            <input type="text" id="supabaseKey" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5c3lnZ3BndXNxeGhpdWFua3RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAyNTc0MDAsImV4cCI6MjA2NTgzMzQwMH0.jD9ARH2kLm2qZ_jQ34UrcP_atVzE5lFmG98SZLyxZzQ" />
+        </div>
+        <button onclick="runAllTests()">🚀 Run All Tests</button>
+        <button onclick="testSignUp()">Test Sign Up</button>
+        <button onclick="testDatabase()">Test Database</button>
+        <button onclick="testStorage()">Test Storage</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        let client;
+
+        function initSupabase() {
+            const url = document.getElementById('supabaseUrl').value;
+            const key = document.getElementById('supabaseKey').value;
+            client = window.supabase.createClient(url, key, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: false,
+                }
+            });
+            return client;
+        }
+
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const colors = {
+                success: '#00d98b',
+                error: '#ff6b6b',
+                warning: '#ffa500',
+                info: '#00EAFF'
+            };
+            results.innerHTML += `<div style="color: ${colors[type]}; margin: 5px 0;">${message}</div>`;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '<div class="test-section"><h2>Test Results</h2></div>';
+        }
+
+        async function testSignUp() {
+            clearResults();
+            log('🔄 Testing Sign Up...', 'info');
+            
+            try {
+                const supabase = initSupabase();
+                const testEmail = `test${Date.now()}@example.com`;
+                const testPassword = 'test123456';
+                
+                log(`Testing with: ${testEmail}`, 'info');
+                
+                const { data, error } = await supabase.auth.signUp({
+                    email: testEmail,
+                    password: testPassword,
+                });
+
+                if (error) {
+                    log(`❌ SIGN UP FAILED: ${error.message}`, 'error');
+                    log(`Error Status: ${error.status}`, 'error');
+                    log(`Full Error: ${JSON.stringify(error, null, 2)}`, 'error');
+                    
+                    if (error.message.includes('Email')) {
+                        log('', 'info');
+                        log('⚠️  This might be because:', 'warning');
+                        log('1. Email provider is not enabled in Supabase', 'warning');
+                        log('2. Email confirmation is required but SMTP is not configured', 'warning');
+                        log('3. Rate limiting (too many signups)', 'warning');
+                    }
+                    return false;
+                } else {
+                    log('✅ Sign Up Successful!', 'success');
+                    log(`User ID: ${data.user?.id}`, 'success');
+                    log(`Email: ${data.user?.email}`, 'success');
+                    log(`Email Confirmed: ${data.user?.email_confirmed_at ? 'Yes' : 'No'}`, 'success');
+                    
+                    // Clean up
+                    await supabase.auth.signOut();
+                    return true;
+                }
+            } catch (e) {
+                log(`❌ FATAL ERROR: ${e.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testDatabase() {
+            clearResults();
+            log('🔄 Testing Database Access...', 'info');
+            
+            try {
+                const supabase = initSupabase();
+                const { data, error } = await supabase.from('profiles').select('id').limit(1);
+                
+                if (error) {
+                    if (error.code === '42P01') {
+                        log('❌ PROFILES TABLE DOES NOT EXIST', 'error');
+                        log('You need to create the profiles table in Supabase SQL Editor', 'error');
+                        showDatabaseSetup();
+                        return false;
+                    } else {
+                        log(`❌ Database Error: ${error.message}`, 'error');
+                        log(`Error Code: ${error.code}`, 'error');
+                        return false;
+                    }
+                } else {
+                    log('✅ Profiles table exists and is accessible', 'success');
+                    log(`Query returned: ${data?.length || 0} rows`, 'success');
+                    return true;
+                }
+            } catch (e) {
+                log(`❌ FATAL ERROR: ${e.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testStorage() {
+            clearResults();
+            log('🔄 Testing Storage Access...', 'info');
+            
+            try {
+                const supabase = initSupabase();
+                const { data, error } = await supabase.storage.listBuckets();
+                
+                if (error) {
+                    log(`❌ Storage Error: ${error.message}`, 'error');
+                    return false;
+                } else {
+                    log('✅ Storage accessible', 'success');
+                    const bucketNames = data.map(b => b.name).join(', ');
+                    log(`Buckets found: ${bucketNames || 'None'}`, 'success');
+                    
+                    const avatarBucket = data.find(b => b.name === 'avatars');
+                    if (!avatarBucket) {
+                        log('⚠️  "avatars" bucket not found - you should create it', 'warning');
+                        return false;
+                    } else {
+                        log('✅ "avatars" bucket exists', 'success');
+                        return true;
+                    }
+                }
+            } catch (e) {
+                log(`❌ FATAL ERROR: ${e.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function runAllTests() {
+            clearResults();
+            log('='.repeat(60), 'info');
+            log('🚀 RUNNING ALL TESTS', 'info');
+            log('='.repeat(60), 'info');
+            log('', 'info');
+
+            // Test 1: Sign Up
+            log('1️⃣ Testing Sign Up...', 'info');
+            const signUpOk = await testSignUp();
+            log('', 'info');
+
+            // Test 2: Database
+            log('2️⃣ Testing Database...', 'info');
+            const dbOk = await testDatabase();
+            log('', 'info');
+
+            // Test 3: Storage
+            log('3️⃣ Testing Storage...', 'info');
+            const storageOk = await testStorage();
+            log('', 'info');
+
+            // Summary
+            log('='.repeat(60), 'info');
+            log('📋 SUMMARY', 'info');
+            log('='.repeat(60), 'info');
+            log(`Authentication: ${signUpOk ? '✅' : '❌'}`, signUpOk ? 'success' : 'error');
+            log(`Database: ${dbOk ? '✅' : '❌'}`, dbOk ? 'success' : 'error');
+            log(`Storage: ${storageOk ? '✅' : '❌'}`, storageOk ? 'success' : 'error');
+
+            if (!signUpOk || !dbOk || !storageOk) {
+                showSetupInstructions();
+            } else {
+                log('', 'info');
+                log('🎉 All tests passed! Your Supabase is ready!', 'success');
+            }
+        }
+
+        function showDatabaseSetup() {
+            const setup = document.createElement('div');
+            setup.className = 'checklist';
+            setup.innerHTML = `
+                <h3>📝 Database Setup Required</h3>
+                <p>Run this SQL in your Supabase SQL Editor:</p>
+                <pre>-- Create profiles table
+CREATE TABLE profiles (
+  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+  username TEXT,
+  avatar_url TEXT,
+  bio TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable Row Level Security
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- Allow users to view their own profile
+CREATE POLICY "Users can view own profile"
+  ON profiles FOR SELECT
+  USING (auth.uid() = id);
+
+-- Allow users to update their own profile
+CREATE POLICY "Users can update own profile"
+  ON profiles FOR UPDATE
+  USING (auth.uid() = id);
+
+-- Allow users to insert their own profile
+CREATE POLICY "Users can insert own profile"
+  ON profiles FOR INSERT
+  WITH CHECK (auth.uid() = id);</pre>
+            `;
+            document.getElementById('results').appendChild(setup);
+        }
+
+        function showSetupInstructions() {
+            const setup = document.createElement('div');
+            setup.className = 'checklist';
+            setup.innerHTML = `
+                <h3>⚠️  Setup Required</h3>
+                <p><strong>Go to your Supabase Dashboard:</strong></p>
+                <ol>
+                    <li>
+                        <strong>Authentication → Settings</strong>
+                        <ul>
+                            <li>Enable "Email" provider</li>
+                            <li>Disable "Confirm email" (for testing)</li>
+                            <li>OR configure SMTP for email confirmation</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>SQL Editor</strong>
+                        <ul>
+                            <li>Create profiles table (see above)</li>
+                            <li>Set up RLS policies</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <strong>Storage</strong>
+                        <ul>
+                            <li>Create "avatars" bucket</li>
+                            <li>Make it public</li>
+                            <li>Set file size limit to 5MB</li>
+                        </ul>
+                    </li>
+                </ol>
+                <p><strong>Your Supabase URL:</strong> <a href="https://supabase.com/dashboard/project/aysyggpgusqxhiuankti" target="_blank" style="color: #00EAFF;">Open Dashboard</a></p>
+            `;
+            document.getElementById('results').appendChild(setup);
+        }
+
+        // Auto-run tests on load
+        window.onload = () => {
+            log('Page loaded. Click "Run All Tests" to start.', 'info');
+        };
+    </script>
+</body>
+</html>
