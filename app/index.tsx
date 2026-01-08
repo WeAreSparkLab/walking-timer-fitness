@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad, radius, shadow } from '../lib/theme';
 import { supabase } from '../lib/supabaseClient';
+import { initializePushNotifications } from '../lib/notifications';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -76,6 +77,8 @@ export default function LoginScreen() {
         if (error) throw error;
 
         if (data.session) {
+          // Initialize push notifications after successful sign in
+          await initializePushNotifications();
           router.replace('/dashboard');
         }
       }

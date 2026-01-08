@@ -26,8 +26,13 @@ export async function createSession(name: string, plan: IntervalDTO[]) {
   if (error) throw error;
 
   // host joins as participant
-  await supabase.from('session_participants')
+  const { error: participantError } = await supabase.from('session_participants')
     .insert({ session_id: data.id, user_id: user.id, role: 'host' });
+  
+  if (participantError) {
+    console.error('Failed to insert participant:', participantError);
+    throw participantError;
+  }
 
   return data as Session;
 }
@@ -103,4 +108,66 @@ export async function listParticipants(sessionId: string) {
   return data as (Participant & {
     profile: { id: string; username: string | null; avatar_url: string | null };
   })[];
+}
+
+// Session Progress API
+export type SessionProgress = {
+  session_id: string;
+  user_id: string;
+  current_interval: number;
+  interval_time_remaining: number;
+  is_paused: boolean;
+  updated_at: string;
+};
+
+export async function updateProgress(
+  sessionId: string,
+  currentInterval: number,
+  intervalTimeRemaining: number,
+  isPaused: boolean
+) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+
+  const { error } = await supabase
+    .from('session_progress')
+    .upsert({
+      session_id: sessionId,
+      user_id: user.id,
+      current_interval: currentInterval,
+      interval_time_remaining: intervalTimeRemaining,
+      is_paused: isPaused,
+      updated_at: new Date().toISOString(),
+    });
+  if (error) throw error;
+}
+
+export async function getSessionProgress(sessionId: string) {
+  const { data, error } = await supabase
+    .from('session_progress')
+    .select('*, profile:profiles!session_progress_user_id_fkey(id,username,avatar_url)')
+    .eq('session_id', sessionId);
+  if (error) throw error;
+
+  return data as (SessionProgress & {
+    profile: { id: string; username: string | null; avatar_url: string | null };
+  })[];
+}
+
+export function subscribeToProgress(sessionId: string, onChange: (progress: SessionProgress[]) => void) {
+  const channel = supabase
+    .channel(`progress:${sessionId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'session_progress',
+      filter: `session_id=eq.${sessionId}`,
+    }, async () => {
+      // Refetch all progress when any update happens
+      const progress = await getSessionProgress(sessionId);
+      onChange(progress);
+    })
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
 }
