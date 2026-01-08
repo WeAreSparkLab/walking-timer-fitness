@@ -9,11 +9,20 @@ import { getPlans, removePlan, WalkPlan } from '../lib/storage';
 import { createAndShareInvite } from '../lib/actions/invites';
 import { useMyProfile } from '../lib/useMyProfile';
 import { supabase } from '../lib/supabaseClient';
+import { Platform } from 'react-native';
 
+
+type GroupWalk = {
+  id: string;
+  name: string;
+  created_at: string;
+  status: string;
+};
 
 export default function Dashboard() {
   const router = useRouter();
   const [plans, setPlans] = useState<WalkPlan[]>([]);
+  const [groupWalks, setGroupWalks] = useState<GroupWalk[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const { username, avatarUrl } = useMyProfile();
@@ -56,16 +65,72 @@ export default function Dashboard() {
     await createAndShareInvite(plans[0]?.name ?? 'Group Walk', plan);
   }
 
+  const loadGroupWalks = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('No user found');
+        return;
+      }
+
+      console.log('Loading group walks for user:', user.id);
+
+      const { data, error } = await supabase
+        .from('session_participants')
+        .select('session_id')
+        .eq('user_id', user.id);
+
+      console.log('Session participants query result:', { data, error });
+
+      if (error) {
+        console.error('Error loading participants:', error);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        console.log('No session participants found');
+        setGroupWalks([]);
+        return;
+      }
+
+      const sessionIds = data.map(d => d.session_id);
+      console.log('Found session IDs:', sessionIds);
+
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('sessions')
+        .select('id, name, created_at, status')
+        .in('id', sessionIds)
+        .order('created_at', { ascending: false });
+
+      console.log('Sessions query result:', { sessions, sessionsError });
+
+      if (sessions) {
+        console.log('Setting group walks:', sessions);
+        setGroupWalks(sessions);
+      }
+    } catch (err) {
+      console.error('Exception in loadGroupWalks:', err);
+    }
+  };
+
   useFocusEffect(useCallback(() => {
     let alive = true;
     (async () => {
       const p = await getPlans();
-      if (alive) setPlans(p);
+      if (alive) {
+        setPlans(p);
+        await loadGroupWalks();
+      }
     })();
     return () => { alive = false; };
   }, []));
 
-  useEffect(() => { (async () => setPlans(await getPlans()))(); }, []);
+  useEffect(() => { 
+    (async () => {
+      setPlans(await getPlans());
+      await loadGroupWalks();
+    })(); 
+  }, []);
 
   if (checkingAuth) {
     return (
@@ -99,7 +164,7 @@ export default function Dashboard() {
         {/* Stats */}
         <View style={styles.statsRow}>
           <View style={[styles.statCard, shadow.card]}>
-            <Text style={styles.statNumber}>13</Text>
+            <Text style={styles.statNumber}>0</Text>
             <Text style={styles.statLabel}>Day Streak</Text>
           </View>
           <View style={[styles.statCard, shadow.card]}>
@@ -125,18 +190,44 @@ export default function Dashboard() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryCta}
-          onPress={handleCreateGroupWalk}
+          onPress={() => router.push('/start-group-walk')}
           activeOpacity={0.8}
         >
           <Ionicons name="people-outline" size={18} color={colors.text} />
-          <Text style={styles.secondaryCtaText}>Create Group Walk (invite)</Text>
+          <Text style={styles.secondaryCtaText}>Start Group Walk</Text>
         </TouchableOpacity>
 
-
-        <TouchableOpacity style={styles.secondaryCta} activeOpacity={0.8}>
-          <Ionicons name="share-social-outline" size={18} color={colors.text} />
-          <Text style={styles.secondaryCtaText}>Invite Friend</Text>
+        <TouchableOpacity 
+          style={styles.secondaryCta} 
+          onPress={() => router.push('/friends')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="person-add-outline" size={18} color={colors.text} />
+          <Text style={styles.secondaryCtaText}>Find Friends</Text>
         </TouchableOpacity>
+
+        {/* Group Walks */}
+        {groupWalks.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>My Group Walks</Text>
+            {groupWalks.map(session => (
+              <TouchableOpacity
+                key={session.id}
+                style={styles.planCard}
+                onPress={() => router.push({ pathname: '/walk-timer', params: { sessionId: session.id } })}
+                activeOpacity={0.85}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.planName}>{session.name || 'Group Walk'}</Text>
+                  <Text style={styles.planMeta}>
+                    {session.status === 'active' ? '🟢 Active' : session.status === 'completed' ? '✅ Completed' : '📅 Scheduled'} · {new Date(session.created_at).toLocaleDateString()}
+                  </Text>
+                </View>
+                <Ionicons name="people" size={20} color={colors.accent} />
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
 
         {/* Plans List */}
         <Text style={styles.sectionTitle}>My Custom Walks</Text>
@@ -151,15 +242,34 @@ export default function Dashboard() {
               style={styles.planCard}
               onPress={() => router.push({ pathname: '/walk-timer', params: { planId: plan.id } })}
               onLongPress={() => {
-                Alert.alert('Delete', `Remove "${plan.name}"?`, [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Delete', style: 'destructive', onPress: async () => {
+                // Protect default walk
+                if (plan.id === 'default-plan') {
+                  if (Platform.OS === 'web') {
+                    window.alert('The default walk cannot be deleted.');
+                  } else {
+                    Alert.alert('Cannot Delete', 'The default walk cannot be deleted.');
+                  }
+                  return;
+                }
+                
+                if (Platform.OS === 'web') {
+                  if (window.confirm(`Remove "${plan.name}"?`)) {
+                    (async () => {
                       await removePlan(plan.id);
                       setPlans(await getPlans());
-                    }
-                  },
-                ]);
+                    })();
+                  }
+                } else {
+                  Alert.alert('Delete', `Remove "${plan.name}"?`, [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete', style: 'destructive', onPress: async () => {
+                        await removePlan(plan.id);
+                        setPlans(await getPlans());
+                      }
+                    },
+                  ]);
+                }
               }}
               activeOpacity={0.85}
             >

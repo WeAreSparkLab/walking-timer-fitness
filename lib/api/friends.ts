@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { notifyFriendRequest, notifyFriendRequestAccepted } from '../notifications';
 
 export type Friendship = {
   id: string;
@@ -19,10 +20,26 @@ export async function sendFriendRequest(addresseeId: string) {
     .select()
     .single();
   if (error) throw error;
+
+  // Get requester username for notification
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('id', user.id)
+    .single();
+
+  // Send push notification to addressee
+  if (profile?.username) {
+    await notifyFriendRequest(addresseeId, profile.username);
+  }
+
   return data as Friendship;
 }
 
 export async function respondToFriendRequest(friendshipId: string, status: 'accepted'|'blocked') {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+
   const { data, error } = await supabase
     .from('friendships')
     .update({ status })
@@ -30,6 +47,20 @@ export async function respondToFriendRequest(friendshipId: string, status: 'acce
     .select()
     .single();
   if (error) throw error;
+
+  // If accepted, notify the requester
+  if (status === 'accepted' && data) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.username) {
+      await notifyFriendRequestAccepted(data.requester_id, profile.username);
+    }
+  }
+
   return data as Friendship;
 }
 

@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad, radius, paceColors } from '../lib/theme';
 import 'react-native-get-random-values';
 import { v4 as uuid } from 'uuid';
-import { savePlan, Pace } from '../lib/storage';
+import { savePlan, getPlanById, Pace } from '../lib/storage';
 
 type IntervalItem = { pace: Pace; minutes: number; seconds: number };
 
 export default function CreateWalk() {
+  const router = useRouter();
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const [walkId, setWalkId] = useState<string | null>(null);
   const [walkName, setWalkName] = useState('');
   const [intervals, setIntervals] = useState<IntervalItem[]>([
     { pace: 'WARMUP', minutes: 3, seconds: 0 },
@@ -18,7 +21,20 @@ export default function CreateWalk() {
     { pace: 'SLOW', minutes: 3, seconds: 0 },
     { pace: 'COOLDOWN', minutes: 3, seconds: 0 },
   ]);
-  const router = useRouter();
+
+  // Load existing plan if editing
+  useEffect(() => {
+    if (editId) {
+      (async () => {
+        const plan = await getPlanById(editId);
+        if (plan) {
+          setWalkId(plan.id);
+          setWalkName(plan.name);
+          setIntervals(plan.intervals);
+        }
+      })();
+    }
+  }, [editId]);
 
   const addInterval = () => setIntervals(prev => [...prev, { pace: 'SLOW', minutes: 3, seconds: 0 }]);
   const removeInterval = (idx: number) => setIntervals(prev => prev.filter((_, i) => i !== idx));
@@ -37,8 +53,8 @@ export default function CreateWalk() {
     if (!walkName.trim()) return Alert.alert('Name needed', 'Give your walk a name.');
     if (!cleaned.length) return Alert.alert('Intervals', 'Add at least one non-zero interval.');
 
-    await savePlan({ id: uuid(), name: walkName.trim(), intervals: cleaned, createdAt: Date.now() });
-    Alert.alert('Saved', 'Walk saved successfully!', [{ text: 'OK', onPress: () => router.back() }]);
+    await savePlan({ id: walkId || uuid(), name: walkName.trim(), intervals: cleaned, createdAt: Date.now() });
+    router.replace('/dashboard');
   };
 
   return (
@@ -48,7 +64,7 @@ export default function CreateWalk() {
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Walk</Text>
+        <Text style={styles.headerTitle}>{editId ? 'Edit Walk' : 'Create Walk'}</Text>
         <View style={{ width: 36 }} />
       </View>
 

@@ -48,6 +48,13 @@
     ],
     "runtimeVersion": {
       "policy": "sdkVersion"
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "97613d29-b17d-4133-a44d-81954ff0c6be"
+      }
+    },
+    "owner": "misscaetano"
   }
 }
