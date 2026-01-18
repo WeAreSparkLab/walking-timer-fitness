@@ -116,9 +116,11 @@ export default function StartGroupWalk() {
       case 'facebook':
         url = `https://www.facebook.com/dialog/send?link=${encodeURIComponent(inviteLink)}&app_id=0&redirect_uri=${encodeURIComponent(window.location.href)}`;
         break;
-      case 'twitter':
-        url = `https://twitter.com/messages/compose?text=${message}`;
-        break;
+      case 'instagram':
+        // Instagram doesn't support URL-based sharing on web, so copy and notify
+        handleCopyLink();
+        window.alert('Link copied! Open Instagram and paste it in a message.');
+        return;
       case 'telegram':
         url = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('Join my walk on Spark Walk!')}`;
         break;
@@ -246,12 +248,12 @@ export default function StartGroupWalk() {
 
                   <TouchableOpacity 
                     style={styles.socialBtn}
-                    onPress={() => handleShareSocial('twitter')}
+                    onPress={() => handleShareSocial('instagram')}
                   >
-                    <View style={[styles.socialIcon, { backgroundColor: '#1DA1F2' }]}>
-                      <Text style={styles.socialEmoji}>𝕏</Text>
+                    <View style={[styles.socialIcon, { backgroundColor: '#E4405F' }]}>
+                      <Text style={styles.socialEmoji}>📷</Text>
                     </View>
-                    <Text style={styles.socialLabel}>Twitter</Text>
+                    <Text style={styles.socialLabel}>Instagram</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity 
