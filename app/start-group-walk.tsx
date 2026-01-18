@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Share, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Share, Platform, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,6 +16,7 @@ export default function StartGroupWalk() {
   const [friends, setFriends] = useState<any[]>([]);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [shareModalVisible, setShareModalVisible] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -60,7 +61,7 @@ export default function StartGroupWalk() {
       console.log('Creating invite...');
       const token = await createInvite(session.id);
       console.log('Invite token:', token);
-      const link = `sparkwalk://join/${token}`;
+      const link = `https://walks.wearesparklab.com/join/${token}`;
       setInviteLink(link);
       
       if (Platform.OS === 'web') {
@@ -80,14 +81,60 @@ export default function StartGroupWalk() {
 
   const handleShareInvite = async () => {
     if (!inviteLink) return;
+    setShareModalVisible(true);
+  };
+
+  const handleCopyLink = async () => {
+    if (!inviteLink) return;
     
-    try {
-      await Share.share({
-        message: `Join my walk on Spark Walk! ${inviteLink}`,
-        title: 'Join Group Walk',
-      });
-    } catch (error) {
-      console.error('Share error:', error);
+    if (Platform.OS === 'web') {
+      try {
+        await navigator.clipboard.writeText(inviteLink);
+        window.alert('Link copied to clipboard!');
+      } catch (error) {
+        window.alert('Failed to copy link');
+      }
+    } else {
+      try {
+        await Share.share({ message: inviteLink });
+      } catch (error) {
+        console.error('Copy error:', error);
+      }
+    }
+  };
+
+  const handleShareSocial = (platform: string) => {
+    if (!inviteLink) return;
+    
+    const message = encodeURIComponent(`Join my walk on Spark Walk! ${inviteLink}`);
+    let url = '';
+    
+    switch (platform) {
+      case 'whatsapp':
+        url = `https://wa.me/?text=${message}`;
+        break;
+      case 'facebook':
+        url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}`;
+        break;
+      case 'twitter':
+        url = `https://twitter.com/intent/tweet?text=${message}`;
+        break;
+      case 'telegram':
+        url = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('Join my walk on Spark Walk!')}`;
+        break;
+    }
+    
+    if (Platform.OS === 'web') {
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleShareToFriend = async (friendId: string, friendName: string) => {
+    // For now, just copy the link when clicking a friend
+    // In the future, this could send a direct notification
+    await handleCopyLink();
+    if (Platform.OS === 'web') {
+      window.alert(`Link copied! Share it with ${friendName}`);
     }
   };
 
@@ -115,7 +162,7 @@ export default function StartGroupWalk() {
         
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.replace('/dashboard')} style={styles.iconBtn}>
-            <Ionicons name="close" size={22} color={colors.text} />
+            <Text style={styles.iconText}>✕</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Ready to Walk!</Text>
           <View style={{ width: 36 }} />
@@ -123,7 +170,7 @@ export default function StartGroupWalk() {
 
         <View style={styles.content}>
           <View style={styles.successCard}>
-            <Ionicons name="checkmark-circle" size={64} color={colors.accent} />
+            <Text style={styles.successIcon}>✓</Text>
             <Text style={styles.successTitle}>{sessionName}</Text>
             <Text style={styles.successSub}>Session created successfully</Text>
           </View>
@@ -133,9 +180,15 @@ export default function StartGroupWalk() {
             <View style={styles.linkBox}>
               <Text style={styles.linkText} numberOfLines={1}>{inviteLink}</Text>
             </View>
+            
+            <TouchableOpacity onPress={handleCopyLink} style={styles.copyBtn} activeOpacity={0.85}>
+              <Text style={styles.copyIcon}>📋</Text>
+              <Text style={styles.copyBtnText}>Copy Link</Text>
+            </TouchableOpacity>
+            
             <TouchableOpacity onPress={handleShareInvite} style={styles.shareBtn} activeOpacity={0.85}>
-              <Ionicons name="share-outline" size={18} color={colors.accent} />
-              <Text style={styles.shareBtnText}>Share Invite Link</Text>
+              <Text style={styles.shareIcon}>↗</Text>
+              <Text style={styles.shareBtnText}>More Share Options</Text>
             </TouchableOpacity>
           </View>
 
@@ -150,6 +203,105 @@ export default function StartGroupWalk() {
             </LinearGradient>
           </TouchableOpacity>
         </View>
+
+        {/* Share Modal */}
+        <Modal
+          visible={shareModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShareModalVisible(false)}
+        >
+          <View style={styles.shareModalOverlay}>
+            <View style={styles.shareModalContent}>
+              <View style={styles.shareModalHeader}>
+                <Text style={styles.shareModalTitle}>Share Walk Invite</Text>
+                <TouchableOpacity onPress={() => setShareModalVisible(false)} style={styles.shareModalClose}>
+                  <Text style={styles.shareModalCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.shareModalScroll}>
+                {/* Social Media Options */}
+                <Text style={styles.shareSection}>Social Media</Text>
+                <View style={styles.socialGrid}>
+                  <TouchableOpacity 
+                    style={styles.socialBtn}
+                    onPress={() => handleShareSocial('whatsapp')}
+                  >
+                    <View style={[styles.socialIcon, { backgroundColor: '#25D366' }]}>
+                      <Text style={styles.socialEmoji}>💬</Text>
+                    </View>
+                    <Text style={styles.socialLabel}>WhatsApp</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.socialBtn}
+                    onPress={() => handleShareSocial('facebook')}
+                  >
+                    <View style={[styles.socialIcon, { backgroundColor: '#1877F2' }]}>
+                      <Text style={styles.socialEmoji}>f</Text>
+                    </View>
+                    <Text style={styles.socialLabel}>Facebook</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.socialBtn}
+                    onPress={() => handleShareSocial('twitter')}
+                  >
+                    <View style={[styles.socialIcon, { backgroundColor: '#1DA1F2' }]}>
+                      <Text style={styles.socialEmoji}>𝕏</Text>
+                    </View>
+                    <Text style={styles.socialLabel}>Twitter</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.socialBtn}
+                    onPress={() => handleShareSocial('telegram')}
+                  >
+                    <View style={[styles.socialIcon, { backgroundColor: '#0088cc' }]}>
+                      <Text style={styles.socialEmoji}>✈️</Text>
+                    </View>
+                    <Text style={styles.socialLabel}>Telegram</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Friends List */}
+                {friends.length > 0 && (
+                  <>
+                    <Text style={styles.shareSection}>Your Friends</Text>
+                    {friends.map((friend) => (
+                      <TouchableOpacity
+                        key={friend.id}
+                        style={styles.friendItem}
+                        onPress={() => handleShareToFriend(friend.id, friend.username || 'Friend')}
+                      >
+                        <View style={styles.friendAvatar}>
+                          <Text style={styles.friendInitial}>
+                            {(friend.username || 'U')[0].toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={styles.friendName}>{friend.username || 'User'}</Text>
+                        <Text style={styles.friendShareIcon}>📤</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                )}
+
+                {/* Copy Link */}
+                <Text style={styles.shareSection}>Or Copy Link</Text>
+                <TouchableOpacity 
+                  style={styles.copyLinkBtn}
+                  onPress={() => {
+                    handleCopyLink();
+                    setShareModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.copyLinkText}>📋 Copy Invite Link</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       </View>
     );
   }
@@ -160,7 +312,7 @@ export default function StartGroupWalk() {
       
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.replace('/dashboard')} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
+          <Text style={styles.iconText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Start Group Walk</Text>
         <View style={{ width: 36 }} />
@@ -250,6 +402,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: 'rgba(255,255,255,0.08)' 
   },
+  iconText: { color: colors.text, fontSize: 20 },
+  successIcon: { color: colors.accent, fontSize: 64, fontWeight: '700' },
+  shareIcon: { color: colors.accent, fontSize: 18 },
 
   content: { 
     flex: 1, 
@@ -402,5 +557,148 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '800',
     fontSize: 18,
+  },
+
+  // Share Modal Styles
+  shareModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+
+  shareModalContent: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingTop: pad.lg,
+    paddingBottom: 40,
+    maxHeight: '80%',
+  },
+
+  shareModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: pad.lg,
+    marginBottom: pad.md,
+  },
+
+  shareModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+  },
+
+  shareModalClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  shareModalCloseText: {
+    fontSize: 20,
+    color: colors.text,
+    fontWeight: '700',
+  },
+
+  shareModalScroll: {
+    paddingHorizontal: pad.lg,
+  },
+
+  shareSection: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    opacity: 0.6,
+    marginTop: pad.lg,
+    marginBottom: pad.md,
+  },
+
+  socialGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: pad.md,
+  },
+
+  socialBtn: {
+    width: '47%',
+    alignItems: 'center',
+    padding: pad.md,
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+  },
+
+  socialIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: pad.sm,
+  },
+
+  socialEmoji: {
+    fontSize: 28,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+
+  socialLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
+
+  friendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: pad.md,
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    marginBottom: pad.sm,
+  },
+
+  friendAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: pad.md,
+  },
+
+  friendInitial: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+
+  friendName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+
+  friendShareIcon: {
+    fontSize: 20,
+  },
+
+  copyLinkBtn: {
+    padding: pad.md,
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    marginTop: pad.sm,
+  },
+
+  copyLinkText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
   },
 });

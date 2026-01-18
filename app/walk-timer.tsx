@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Alert, ScrollView, TextInput, Modal, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Alert, ScrollView, TextInput, Modal, KeyboardAvoidingView, Image } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -12,10 +12,15 @@ import {
   getSessionProgress, 
   subscribeToProgress,
   SessionProgress,
-  getSession 
+  getSession,
+  updateSessionControl,
+  subscribeToSessionControl
 } from '../lib/api/sessions';
 import { sendMessage, subscribeMessages } from '../lib/api/messages';
 import { useMyProfile } from '../lib/useMyProfile';
+import { notifyGroupMessage } from '../lib/webNotifications';
+import { recordWalkActivity } from '../lib/api/stats';
+import { supabase } from '../lib/supabaseClient';
 
 // Web-safe haptics wrapper
 const safeHaptics = {
@@ -100,12 +105,18 @@ export default function WalkTimer() {
   const [isRunning, setIsRunning] = useState(false);
   const [currentPace, setCurrentPace] = useState<Pace>('WARMUP');
   const [participantsProgress, setParticipantsProgress] = useState<SessionProgress[]>([]);
+  const [sessionParticipants, setSessionParticipants] = useState<Array<{ user_id: string; username?: string; avatar_url?: string }>>([]);
   const [sessionName, setSessionName] = useState<string | null>(null);
+  const [sessionHostId, setSessionHostId] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState(false);
   const [chatVisible, setChatVisible] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
   const [messageText, setMessageText] = useState('');
+  const [lastReadTime, setLastReadTime] = useState<string | null>(null);
   const { profile } = useMyProfile();
   const intervalRef = useRef<any>(null);
+  const isUpdatingControlRef = useRef(false);
+  const scrollViewRef = useRef<any>(null);
 
   // Load plan or default (now includes warmup/cooldown)
   useEffect(() => {
@@ -116,6 +127,8 @@ export default function WalkTimer() {
           const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
           const session = await getSession(sid);
           setSessionName(session.name);
+          setSessionHostId(session.host_id);
+          
           const ivs = (session.plan as any[]).map((i: any) => ({ 
             pace: i.pace as Pace, 
             duration: i.minutes * 60 + i.seconds 
@@ -126,6 +139,34 @@ export default function WalkTimer() {
           // Load initial progress
           const progress = await getSessionProgress(sid);
           setParticipantsProgress(progress);
+          
+          // Load all participants in the session
+          const { data: participants } = await supabase
+            .from('session_participants')
+            .select('user_id')
+            .eq('session_id', sid);
+          
+          if (participants && participants.length > 0) {
+            const userIds = participants.map(p => p.user_id);
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url')
+              .in('id', userIds);
+            
+            // Sort: host first
+            const sortedProfiles = (profiles || []).sort((a, b) => {
+              if (a.id === session.host_id) return -1;
+              if (b.id === session.host_id) return 1;
+              return 0;
+            });
+            
+            setSessionParticipants(sortedProfiles.map(p => ({
+              user_id: p.id,
+              username: p.username,
+              avatar_url: p.avatar_url,
+            })));
+          }
+          
           return;
         } catch (error) {
           console.error('Failed to load session:', error);
@@ -155,29 +196,74 @@ export default function WalkTimer() {
     })();
   }, [planId, sessionId]);
 
-  // Subscribe to real-time progress updates for group walks
+  // Check if current user is the host when profile loads
+  useEffect(() => {
+    if (sessionHostId && profile?.id) {
+      const isCurrentUserHost = sessionHostId === profile.id;
+      console.log('Host check:', { sessionHostId, profileId: profile.id, isCurrentUserHost });
+      setIsHost(isCurrentUserHost);
+    }
+  }, [sessionHostId, profile?.id]);
+
+  // Load last read time from localStorage
+  useEffect(() => {
+    if (sessionId) {
+      const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
+      const stored = localStorage.getItem(`chat-last-read-${sid}`);
+      if (stored) {
+        setLastReadTime(stored);
+      }
+    }
+  }, [sessionId]);
+
+  // Subscribe to all real-time updates for group walks (consolidated to avoid multiple WebSocket connections)
   useEffect(() => {
     if (!sessionId) return;
     
     const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
-    const unsubscribe = subscribeToProgress(sid, (progress) => {
+    
+    // All subscriptions for this session
+    const unsubscribeProgress = subscribeToProgress(sid, (progress) => {
       setParticipantsProgress(progress);
     });
     
-    return unsubscribe;
-  }, [sessionId]);
-
-  // Subscribe to chat messages
-  useEffect(() => {
-    if (!sessionId) return;
-    
-    const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
-    const unsubscribe = subscribeMessages(sid, (message) => {
+    const unsubscribeMessages = subscribeMessages(sid, async (message) => {
       setMessages(prev => [...prev, message]);
+      
+      // Show notification for new messages (only if not from current user)
+      if (profile?.id && message.sender_id !== profile.id) {
+        const senderName = message.sender?.username || message.sender?.email || 'Someone';
+        await notifyGroupMessage(senderName, message.text, sid);
+      }
     });
     
-    return unsubscribe;
+    const unsubscribeControl = subscribeToSessionControl(sid, (data) => {
+      // Ignore updates if we're the host making a change
+      if (isUpdatingControlRef.current) {
+        return;
+      }
+      // Apply host's control changes to all participants
+      setIsRunning(data.isRunning);
+      setCurrentInterval(data.currentInterval);
+      setIntervalTime(data.timeRemaining);
+    });
+    
+    // Clean up all subscriptions
+    return () => {
+      unsubscribeProgress();
+      unsubscribeMessages();
+      unsubscribeControl();
+    };
   }, [sessionId]);
+
+  // Auto-scroll to bottom when messages change or chat opens
+  useEffect(() => {
+    if (chatVisible && scrollViewRef.current) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [chatVisible, messages.length]);
 
   useEffect(() => {
     if (!ready || intervals.length === 0) return;
@@ -195,6 +281,14 @@ export default function WalkTimer() {
           clearInterval(intervalRef.current!);
           setIsRunning(false);
           safeHaptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          
+          // Record completed walk activity
+          const totalDuration = intervals.reduce((s, i) => s + i.duration, 0);
+          const sid = sessionId ? (typeof sessionId === 'string' ? sessionId : sessionId[0]) : undefined;
+          recordWalkActivity(totalDuration, intervals.length, sid)
+            .then(() => console.log('Walk activity recorded!'))
+            .catch(err => console.error('Failed to record activity:', err));
+          
           return 0;
         }
         return prev - 1;
@@ -309,7 +403,7 @@ export default function WalkTimer() {
       <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
+        <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{sessionName || 'Walk Timer'}</Text>
@@ -327,19 +421,88 @@ export default function WalkTimer() {
         )}
       </View>
 
-      {/* Group walk participants */}
+      <ScrollView 
+        style={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContentContainer}
+      >
+      {/* Session participants (shown always for group walks) */}
+      {sessionId && sessionParticipants.length > 0 && (
+        <View style={styles.sessionParticipantsContainer}>
+          <Text style={styles.sessionParticipantsTitle}>
+            👥 Participants ({sessionParticipants.length})
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sessionParticipantsScroll}>
+            {sessionParticipants.map((participant) => {
+              const isParticipantHost = participant.user_id === sessionHostId;
+              return (
+                <View key={participant.user_id} style={styles.sessionParticipantCard}>
+                  <View style={styles.sessionParticipantAvatarContainer}>
+                    {participant.avatar_url ? (
+                      <Image 
+                        source={{ uri: participant.avatar_url }} 
+                        style={styles.sessionParticipantAvatarImage}
+                      />
+                    ) : (
+                      <View style={styles.sessionParticipantAvatarPlaceholder}>
+                        <Text style={styles.sessionParticipantAvatarText}>
+                          {(participant.username || 'U')[0].toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    {isParticipantHost && (
+                      <View style={styles.hostBadgeSmall}>
+                        <Text style={styles.hostBadgeTextSmall}>👑</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.sessionParticipantName} numberOfLines={1}>
+                    {participant.username || 'User'}
+                  </Text>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Group walk participants (live progress during walk) */}
       {sessionId && participantsProgress.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.participantsScroll}>
-          {participantsProgress.map((p) => {
+        <View style={styles.liveProgressContainer}>
+          <Text style={styles.liveProgressTitle}>🏃 Live Progress</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.participantsScroll}>
+            {participantsProgress
+            .sort((a, b) => {
+              // Host first
+              if (a.user_id === sessionHostId) return -1;
+              if (b.user_id === sessionHostId) return 1;
+              return 0;
+            })
+            .map((p) => {
             const paceColor = intervals[p.current_interval]?.pace 
               ? paceColors[intervals[p.current_interval].pace]
               : paceColors.WARMUP;
+            const isParticipantHost = p.user_id === sessionHostId;
             return (
               <View key={p.user_id} style={styles.participantCard}>
-                <View style={[styles.participantAvatar, { borderColor: paceColor.border }]}>
-                  <Text style={styles.participantInitial}>
-                    {(p.profile?.username || 'U')[0].toUpperCase()}
-                  </Text>
+                <View style={[styles.participantAvatarContainer, { borderColor: paceColor.border }]}>
+                  {p.profile?.avatar_url ? (
+                    <Image 
+                      source={{ uri: p.profile.avatar_url }} 
+                      style={styles.participantAvatarImage}
+                    />
+                  ) : (
+                    <View style={styles.participantAvatar}>
+                      <Text style={styles.participantInitial}>
+                        {(p.profile?.username || 'U')[0].toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  {isParticipantHost && (
+                    <View style={styles.hostBadgeSmall}>
+                      <Text style={styles.hostBadgeTextSmall}>👑</Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={styles.participantName} numberOfLines={1}>
                   {p.profile?.username || 'User'}
@@ -354,6 +517,7 @@ export default function WalkTimer() {
             );
           })}
         </ScrollView>
+        </View>
       )}
 
       {/* Pace badge */}
@@ -370,6 +534,15 @@ export default function WalkTimer() {
           </Text>
         </View>
       </View>
+
+      {/* Host/Participant indicator for group walks */}
+      {sessionId && (
+        <View style={styles.roleIndicator}>
+          <Text style={styles.roleText}>
+            {isHost ? '👑 Walk Leader - You control the timer' : '👥 Participant - Timer syncs with leader'}
+          </Text>
+        </View>
+      )}
 
       {/* Big timer */}
       <View style={styles.timerCard}>
@@ -434,8 +607,32 @@ export default function WalkTimer() {
       {/* Controls */}
       <View style={styles.controls}>
         <TouchableOpacity
-          onPress={() => setIsRunning(!isRunning)}
-          style={[styles.ctrl, { flex: 1 }]}
+          onPress={async () => {
+            // Only host can control in group walks
+            if (sessionId && !isHost) {
+              if (Platform.OS === 'web') {
+                window.alert('Only the walk creator can control the timer');
+              }
+              return;
+            }
+            
+            const newRunning = !isRunning;
+            setIsRunning(newRunning);
+            if (sessionId) {
+              const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
+              try {
+                isUpdatingControlRef.current = true;
+                await updateSessionControl(sid, newRunning, currentInterval, intervalTime);
+                setTimeout(() => {
+                  isUpdatingControlRef.current = false;
+                }, 500);
+              } catch (error) {
+                console.error('Failed to sync play/pause:', error);
+                isUpdatingControlRef.current = false;
+              }
+            }
+          }}
+          style={[styles.ctrl, { flex: 1, opacity: sessionId && !isHost ? 0.5 : 1 }]}
           activeOpacity={0.9}
         >
           <LinearGradient colors={[colors.accent, colors.accent2]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.ctrlGrad}>
@@ -444,11 +641,35 @@ export default function WalkTimer() {
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={resetTimer} style={[styles.ctrlOutline, { flex: 1 }]} activeOpacity={0.85}>
+        <TouchableOpacity onPress={async () => {
+          // Only host can control in group walks
+          if (sessionId && !isHost) {
+            if (Platform.OS === 'web') {
+              window.alert('Only the walk creator can control the timer');
+            }
+            return;
+          }
+          
+          resetTimer();
+          if (sessionId) {
+            const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
+            try {
+              isUpdatingControlRef.current = true;
+              await updateSessionControl(sid, false, 0, intervals[0]?.duration ?? 0);
+              setTimeout(() => {
+                isUpdatingControlRef.current = false;
+              }, 500);
+            } catch (error) {
+              console.error('Failed to sync reset:', error);
+              isUpdatingControlRef.current = false;
+            }
+          }
+        }} style={[styles.ctrlOutline, { flex: 1, opacity: sessionId && !isHost ? 0.5 : 1 }]} activeOpacity={0.85}>
           <Ionicons name="refresh" size={18} color={colors.text} />
           <Text style={styles.ctrlOutlineText}>Reset</Text>
         </TouchableOpacity>
       </View>
+      </ScrollView>
 
       {/* Chat Button (only for group walks) */}
       {sessionId && (
@@ -464,11 +685,16 @@ export default function WalkTimer() {
             style={styles.chatFabGrad}
           >
             <Ionicons name="chatbubbles" size={24} color={colors.text} />
-            {messages.length > 0 && (
-              <View style={styles.chatBadge}>
-                <Text style={styles.chatBadgeText}>{messages.length}</Text>
-              </View>
-            )}
+            {(() => {
+              const unreadCount = messages.filter(m => 
+                !lastReadTime || new Date(m.created_at) > new Date(lastReadTime)
+              ).length;
+              return unreadCount > 0 ? (
+                <View style={styles.chatBadge}>
+                  <Text style={styles.chatBadgeText}>{unreadCount}</Text>
+                </View>
+              ) : null;
+            })()}
           </LinearGradient>
         </TouchableOpacity>
       )}
@@ -479,6 +705,15 @@ export default function WalkTimer() {
         animationType="slide"
         transparent={true}
         onRequestClose={() => setChatVisible(false)}
+        onShow={() => {
+          // Mark all messages as read when chat opens
+          if (sessionId) {
+            const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
+            const now = new Date().toISOString();
+            localStorage.setItem(`chat-last-read-${sid}`, now);
+            setLastReadTime(now);
+          }
+        }}
       >
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
@@ -492,7 +727,11 @@ export default function WalkTimer() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.messagesList}>
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.messagesList}
+              onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+            >
               {messages.map((msg, idx) => {
                 const isMe = msg.sender_id === profile?.id;
                 return (
@@ -537,13 +776,78 @@ export default function WalkTimer() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: pad.lg },
   bgGlow: { position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
+  scrollContent: { flex: 1 },
+  scrollContentContainer: { paddingBottom: 120 },
   header: { paddingTop: 56, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
   iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
 
+  sessionParticipantsContainer: {
+    marginTop: 16,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: pad.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  sessionParticipantsTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  sessionParticipantsScroll: {
+    maxHeight: 80,
+  },
+  sessionParticipantCard: {
+    alignItems: 'center',
+    marginRight: 16,
+    width: 60,
+  },
+  sessionParticipantAvatarContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginBottom: 6,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  sessionParticipantAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
+  },
+  sessionParticipantAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
+    backgroundColor: colors.accent + '30',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sessionParticipantAvatarText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  sessionParticipantName: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  liveProgressContainer: {
+    marginTop: 16,
+  },
+  liveProgressTitle: {
+    color: colors.sub,
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+
   participantsScroll: {
-    marginTop: 12,
     maxHeight: 100,
   },
   participantCard: {
@@ -551,20 +855,48 @@ const styles = StyleSheet.create({
     marginRight: 16,
     width: 70,
   },
-  participantAvatar: {
+  participantAvatarContainer: {
     width: 48,
     height: 48,
     borderRadius: 999,
     borderWidth: 2,
+    marginBottom: 6,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  participantAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+  },
+  participantAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
   },
   participantInitial: {
     color: colors.text,
     fontSize: 18,
     fontWeight: '800',
+  },
+  hostBadgeSmall: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.bg,
+  },
+  hostBadgeTextSmall: {
+    fontSize: 11,
   },
   participantName: {
     color: colors.text,
@@ -588,6 +920,22 @@ const styles = StyleSheet.create({
   paceLabel: { color: colors.sub },
   paceBadge: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1 },
   paceText: { color: colors.text, fontWeight: '800', letterSpacing: 1 },
+
+  roleIndicator: {
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: 'rgba(138,43,226,0.1)',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(138,43,226,0.3)',
+    alignItems: 'center',
+  },
+  roleText: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 
   timerCard: {
     marginTop: 16, backgroundColor: colors.card, borderRadius: radius.lg, paddingVertical: 26, borderWidth: 1, borderColor: colors.line,

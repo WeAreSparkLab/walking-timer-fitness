@@ -38,13 +38,13 @@ export default function JoinByToken() {
           </>
         ) : error ? (
           <>
-            <Ionicons name="alert-circle" size={64} color={colors.danger} />
+            <Text style={styles.errorIcon}>⚠</Text>
             <Text style={styles.errorText}>{error}</Text>
             <Text style={styles.subText}>Redirecting to dashboard...</Text>
           </>
         ) : (
           <>
-            <Ionicons name="checkmark-circle" size={64} color={colors.accent} />
+            <Text style={styles.successIcon}>✓</Text>
             <Text style={styles.text}>Joined! Starting walk...</Text>
           </>
         )}
@@ -80,4 +80,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
   },
+  errorIcon: { fontSize: 64, color: colors.danger },
+  successIcon: { fontSize: 64, color: colors.accent, fontWeight: '700' },
 });

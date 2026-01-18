@@ -32,7 +32,10 @@
       "themeColor": "#8A2BE2",
       "display": "standalone",
       "orientation": "portrait",
-      "startUrl": "/"
+      "startUrl": "/",
+      "preferRelatedApplications": false,
+      "scope": "/",
+      "lang": "en"
     },
     "plugins": [
       "expo-router",

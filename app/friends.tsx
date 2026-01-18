@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,6 +7,7 @@ import { colors, pad, radius } from '../lib/theme';
 import { supabase } from '../lib/supabaseClient';
 import { sendFriendRequest, listMyFriends, listIncomingFriendRequests, respondToFriendRequest } from '../lib/api/friends';
 import { useMyProfile } from '../lib/useMyProfile';
+import { notifyFriendRequest } from '../lib/webNotifications';
 
 export default function Friends() {
   const router = useRouter();
@@ -16,12 +17,54 @@ export default function Friends() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [friends, setFriends] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
+  const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadFriends();
     loadRequests();
+    loadSentRequests();
   }, []);
+
+  // Subscribe to incoming friend requests for real-time notifications
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const channel = supabase
+      .channel('friend-requests')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'friendships',
+          filter: `addressee_id=eq.${profile.id}`,
+        },
+        async (payload) => {
+          console.log('New friend request received:', payload);
+          
+          // Reload requests to show in UI
+          loadRequests();
+          
+          // Get requester's profile for notification
+          const { data: requesterProfile } = await supabase
+            .from('profiles')
+            .select('username, email')
+            .eq('id', payload.new.requester_id)
+            .single();
+          
+          if (requesterProfile) {
+            const username = requesterProfile.username || requesterProfile.email || 'Someone';
+            await notifyFriendRequest(username);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id]);
 
   const loadFriends = async () => {
     try {
@@ -38,6 +81,26 @@ export default function Friends() {
       setRequests(data);
     } catch (error) {
       console.error('Failed to load requests:', error);
+    }
+  };
+
+  const loadSentRequests = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('friendships')
+        .select('addressee_id')
+        .eq('requester_id', user.id)
+        .eq('status', 'pending');
+      
+      if (error) throw error;
+      
+      const addresseeIds = new Set(data?.map(f => f.addressee_id) || []);
+      setSentRequests(addresseeIds);
+    } catch (error) {
+      console.error('Failed to load sent requests:', error);
     }
   };
 
@@ -66,6 +129,7 @@ export default function Friends() {
   const handleAddFriend = async (userId: string) => {
     try {
       await sendFriendRequest(userId);
+      setSentRequests(prev => new Set([...prev, userId]));
       Alert.alert('Success', 'Friend request sent!');
     } catch (error: any) {
       console.error('Add friend error:', error);
@@ -99,8 +163,8 @@ export default function Friends() {
       <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
       
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.iconBtn}>
+          <Text style={styles.iconText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Friends</Text>
         <View style={{ width: 36 }} />
@@ -151,7 +215,7 @@ export default function Friends() {
           <View style={styles.section}>
             {friends.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="people-outline" size={64} color={colors.sub} />
+                <Text style={styles.emptyIcon}>👥</Text>
                 <Text style={styles.emptyText}>No friends yet</Text>
                 <Text style={styles.emptySubText}>Search for people to add them</Text>
               </View>
@@ -159,16 +223,26 @@ export default function Friends() {
               friends.map((friend) => (
                 <View key={friend.id} style={styles.userCard}>
                   <View style={styles.userAvatar}>
-                    <Text style={styles.userAvatarText}>
-                      {(friend.username || friend.email || 'U')[0].toUpperCase()}
-                    </Text>
+                    {friend.avatar_url ? (
+                      <Image source={{ uri: friend.avatar_url }} style={styles.avatarImage} />
+                    ) : (
+                      <Text style={styles.userAvatarText}>
+                        {(friend.username || friend.email || 'U')[0].toUpperCase()}
+                      </Text>
+                    )}
                   </View>
                   <View style={styles.userInfo}>
                     <Text style={styles.userName}>{friend.username || 'User'}</Text>
                     {friend.email && <Text style={styles.userEmail}>{friend.email}</Text>}
                   </View>
-                  <TouchableOpacity style={styles.userAction}>
-                    <Ionicons name="chatbubble-outline" size={20} color={colors.accent} />
+                  <TouchableOpacity 
+                    style={styles.userAction}
+                    onPress={() => router.push({ 
+                      pathname: '/chat/[friendId]', 
+                      params: { friendId: friend.id, friendName: friend.username || 'User' } 
+                    })}
+                  >
+                    <Text style={styles.chatIcon}>💬</Text>
                   </TouchableOpacity>
                 </View>
               ))
@@ -188,7 +262,7 @@ export default function Friends() {
                 onSubmitEditing={handleSearch}
               />
               <TouchableOpacity onPress={handleSearch} style={styles.searchBtn}>
-                <Ionicons name="search" size={20} color={colors.accent} />
+                <Text style={styles.searchIcon}>🔍</Text>
               </TouchableOpacity>
             </View>
 
@@ -196,29 +270,44 @@ export default function Friends() {
               <Text style={styles.loadingText}>Searching...</Text>
             ) : searchResults.length === 0 && searchQuery ? (
               <View style={styles.emptyState}>
-                <Ionicons name="search-outline" size={64} color={colors.sub} />
+                <Text style={styles.emptyIcon}>🔍</Text>
                 <Text style={styles.emptyText}>No users found</Text>
               </View>
             ) : (
-              searchResults.map((user) => (
-                <View key={user.id} style={styles.userCard}>
-                  <View style={styles.userAvatar}>
-                    <Text style={styles.userAvatarText}>
-                      {(user.username || user.email || 'U')[0].toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.userInfo}>
-                    <Text style={styles.userName}>{user.username || 'User'}</Text>
-                    {user.email && <Text style={styles.userEmail}>{user.email}</Text>}
-                  </View>
-                  <TouchableOpacity 
-                    onPress={() => handleAddFriend(user.id)}
-                    style={styles.addBtn}
-                  >
-                    <Ionicons name="person-add" size={18} color={colors.text} />
-                  </TouchableOpacity>
-                </View>
-              ))
+              searchResults
+                .filter(user => {
+                  // Filter out existing friends
+                  const isFriend = friends.some(f => f.id === user.id);
+                  return !isFriend;
+                })
+                .map((user) => {
+                  const isPending = sentRequests.has(user.id);
+                  return (
+                    <View key={user.id} style={styles.userCard}>
+                      <View style={styles.userAvatar}>
+                        {user.avatar_url ? (
+                          <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
+                        ) : (
+                          <Text style={styles.userAvatarText}>
+                            {(user.username || user.email || 'U')[0].toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.userInfo}>
+                        <Text style={styles.userName}>{user.username || 'User'}</Text>
+                        {user.email && <Text style={styles.userEmail}>{user.email}</Text>}
+                        {isPending && <Text style={styles.pendingText}>Request Pending</Text>}
+                      </View>
+                      <TouchableOpacity 
+                        onPress={() => !isPending && handleAddFriend(user.id)}
+                        style={[styles.addBtn, isPending && styles.addBtnDisabled]}
+                        disabled={isPending}
+                      >
+                        <Text style={styles.addIcon}>{isPending ? '⏳' : '+'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })
             )}
           </View>
         )}
@@ -227,16 +316,20 @@ export default function Friends() {
           <View style={styles.section}>
             {requests.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="mail-outline" size={64} color={colors.sub} />
+                <Text style={styles.emptyIcon}>📬</Text>
                 <Text style={styles.emptyText}>No pending requests</Text>
               </View>
             ) : (
               requests.map((req) => (
                 <View key={req.id} style={styles.requestCard}>
                   <View style={styles.userAvatar}>
-                    <Text style={styles.userAvatarText}>
-                      {(req.requester?.username || 'U')[0].toUpperCase()}
-                    </Text>
+                    {req.requester?.avatar_url ? (
+                      <Image source={{ uri: req.requester.avatar_url }} style={styles.avatarImage} />
+                    ) : (
+                      <Text style={styles.userAvatarText}>
+                        {(req.requester?.username || 'U')[0].toUpperCase()}
+                      </Text>
+                    )}
                   </View>
                   <View style={styles.userInfo}>
                     <Text style={styles.userName}>{req.requester?.username || 'User'}</Text>
@@ -249,13 +342,13 @@ export default function Friends() {
                       onPress={() => handleAcceptRequest(req.id)}
                       style={styles.acceptBtn}
                     >
-                      <Ionicons name="checkmark" size={20} color={colors.text} />
+                      <Text style={styles.checkIcon}>✓</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       onPress={() => handleRejectRequest(req.id)}
                       style={styles.rejectBtn}
                     >
-                      <Ionicons name="close" size={20} color={colors.danger} />
+                      <Text style={[styles.checkIcon, { color: colors.danger }]}>✕</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -393,6 +486,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(138,43,226,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.accent,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 999,
   },
   userAvatarText: {
     color: colors.text,
@@ -425,6 +526,16 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.sm,
     backgroundColor: colors.accent,
+  },
+  addBtnDisabled: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    opacity: 0.5,
+  },
+  pendingText: {
+    color: colors.accent,
+    fontSize: 11,
+    marginTop: 2,
+    fontStyle: 'italic',
   },
 
   requestCard: {
@@ -469,6 +580,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 60,
   },
+  emptyIcon: { fontSize: 64, opacity: 0.6 },
   emptyText: {
     color: colors.text,
     fontSize: 18,
@@ -480,6 +592,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 4,
   },
+  iconText: { color: colors.text, fontSize: 20 },
+  chatIcon: { color: colors.accent, fontSize: 20 },
+  searchIcon: { color: colors.accent, fontSize: 20 },
+  addIcon: { color: colors.text, fontSize: 18, fontWeight: '600' },
+  checkIcon: { color: colors.text, fontSize: 20 },
   loadingText: {
     color: colors.sub,
     textAlign: 'center',

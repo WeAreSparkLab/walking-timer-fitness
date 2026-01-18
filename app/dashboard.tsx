@@ -1,6 +1,6 @@
 //app/dashboard.tsx
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +10,7 @@ import { createAndShareInvite } from '../lib/actions/invites';
 import { useMyProfile } from '../lib/useMyProfile';
 import { supabase } from '../lib/supabaseClient';
 import { Platform } from 'react-native';
+import { getUserStats, getPeriodStats, formatDuration, UserStats, PeriodStats } from '../lib/api/stats';
 
 
 type GroupWalk = {
@@ -17,6 +18,12 @@ type GroupWalk = {
   name: string;
   created_at: string;
   status: string;
+  host_id: string;
+  participants: Array<{
+    user_id: string;
+    username?: string;
+    avatar_url?: string;
+  }>;
 };
 
 export default function Dashboard() {
@@ -25,6 +32,10 @@ export default function Dashboard() {
   const [groupWalks, setGroupWalks] = useState<GroupWalk[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [weeklyStats, setWeeklyStats] = useState<PeriodStats>({ points: 0, walks: 0, duration_seconds: 0 });
+  const [monthlyStats, setMonthlyStats] = useState<PeriodStats>({ points: 0, walks: 0, duration_seconds: 0 });
+  const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'all'>('all');
   const { username, avatarUrl } = useMyProfile();
 
   // Check authentication on mount
@@ -34,6 +45,8 @@ export default function Dashboard() {
         router.replace('/');
       } else {
         setIsAuthenticated(true);
+        // Load data after confirming authentication
+        loadInitialData();
       }
       setCheckingAuth(false);
     });
@@ -44,11 +57,36 @@ export default function Dashboard() {
         router.replace('/');
       } else {
         setIsAuthenticated(true);
+        loadInitialData();
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const loadInitialData = async () => {
+    console.log('Loading initial data...');
+    const plans = await getPlans();
+    console.log('Loaded plans:', plans.length);
+    setPlans(plans);
+    await loadGroupWalks();
+    await loadStats();
+  };
+
+  const loadStats = async () => {
+    try {
+      const [userStats, weekly, monthly] = await Promise.all([
+        getUserStats(),
+        getPeriodStats('week'),
+        getPeriodStats('month'),
+      ]);
+      setStats(userStats);
+      setWeeklyStats(weekly);
+      setMonthlyStats(monthly);
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  };
 
   async function handleCreateGroupWalk() {
     // pick a plan (first saved or a default)
@@ -98,39 +136,67 @@ export default function Dashboard() {
 
       const { data: sessions, error: sessionsError } = await supabase
         .from('sessions')
-        .select('id, name, created_at, status')
+        .select('id, name, created_at, status, host_id')
         .in('id', sessionIds)
         .order('created_at', { ascending: false });
 
       console.log('Sessions query result:', { sessions, sessionsError });
 
-      if (sessions) {
-        console.log('Setting group walks:', sessions);
-        setGroupWalks(sessions);
+      if (sessions && sessions.length > 0) {
+        // Fetch participants for each session
+        const sessionsWithParticipants = await Promise.all(
+          sessions.map(async (session) => {
+            // Get participant user IDs
+            const { data: participants } = await supabase
+              .from('session_participants')
+              .select('user_id')
+              .eq('session_id', session.id);
+
+            if (!participants || participants.length === 0) {
+              return { ...session, participants: [] };
+            }
+
+            const userIds = participants.map(p => p.user_id);
+
+            // Fetch profiles for participants
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url')
+              .in('id', userIds);
+
+            // Sort: host first, then others
+            const profilesWithOrder = (profiles || []).sort((a, b) => {
+              if (a.id === session.host_id) return -1;
+              if (b.id === session.host_id) return 1;
+              return 0;
+            });
+
+            return {
+              ...session,
+              participants: profilesWithOrder.map(p => ({
+                user_id: p.id,
+                username: p.username,
+                avatar_url: p.avatar_url,
+              })),
+            };
+          })
+        );
+
+        console.log('Setting group walks with participants:', sessionsWithParticipants);
+        setGroupWalks(sessionsWithParticipants);
       }
     } catch (err) {
       console.error('Exception in loadGroupWalks:', err);
     }
   };
 
+  // Reload data when screen comes into focus
   useFocusEffect(useCallback(() => {
-    let alive = true;
-    (async () => {
-      const p = await getPlans();
-      if (alive) {
-        setPlans(p);
-        await loadGroupWalks();
-      }
-    })();
-    return () => { alive = false; };
-  }, []));
-
-  useEffect(() => { 
-    (async () => {
-      setPlans(await getPlans());
-      await loadGroupWalks();
-    })(); 
-  }, []);
+    if (isAuthenticated) {
+      console.log('Screen focused, reloading data...');
+      loadInitialData();
+    }
+  }, [isAuthenticated]));
 
   if (checkingAuth) {
     return (
@@ -157,19 +223,63 @@ export default function Dashboard() {
           </Text>
         </View>
         <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/profile')}>
-          <Ionicons name="settings-outline" size={22} color={colors.sub} />
+          <Text style={styles.settingsIcon}>⚙️</Text>
         </TouchableOpacity>
       </View>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Period Selector */}
+        <View style={styles.periodSelector}>
+          <TouchableOpacity 
+            style={[styles.periodBtn, selectedPeriod === 'week' && styles.periodBtnActive]}
+            onPress={() => setSelectedPeriod('week')}
+          >
+            <Text style={[styles.periodText, selectedPeriod === 'week' && styles.periodTextActive]}>Week</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.periodBtn, selectedPeriod === 'month' && styles.periodBtnActive]}
+            onPress={() => setSelectedPeriod('month')}
+          >
+            <Text style={[styles.periodText, selectedPeriod === 'month' && styles.periodTextActive]}>Month</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.periodBtn, selectedPeriod === 'all' && styles.periodBtnActive]}
+            onPress={() => setSelectedPeriod('all')}
+          >
+            <Text style={[styles.periodText, selectedPeriod === 'all' && styles.periodTextActive]}>All Time</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Stats */}
         <View style={styles.statsRow}>
           <View style={[styles.statCard, shadow.card]}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Day Streak</Text>
+            <Text style={styles.statNumber}>
+              {selectedPeriod === 'all' && (stats?.total_points || 0)}
+              {selectedPeriod === 'month' && monthlyStats.points}
+              {selectedPeriod === 'week' && weeklyStats.points}
+            </Text>
+            <Text style={styles.statLabel}>Points</Text>
           </View>
           <View style={[styles.statCard, shadow.card]}>
-            <Text style={styles.statNumber}>{plans.length}</Text>
-            <Text style={styles.statLabel}>Saved Plans</Text>
+            <Text style={styles.statNumber}>{stats?.current_streak_days || 0}</Text>
+            <Text style={styles.statLabel}>Day Streak</Text>
+          </View>
+        </View>
+        <View style={styles.statsRow}>
+          <View style={[styles.statCard, shadow.card]}>
+            <Text style={styles.statNumber}>
+              {selectedPeriod === 'all' && (stats?.total_walks || 0)}
+              {selectedPeriod === 'month' && monthlyStats.walks}
+              {selectedPeriod === 'week' && weeklyStats.walks}
+            </Text>
+            <Text style={styles.statLabel}>Walks</Text>
+          </View>
+          <View style={[styles.statCard, shadow.card]}>
+            <Text style={styles.statNumber}>
+              {selectedPeriod === 'all' && formatDuration(stats?.total_duration_seconds || 0)}
+              {selectedPeriod === 'month' && formatDuration(monthlyStats.duration_seconds)}
+              {selectedPeriod === 'week' && formatDuration(weeklyStats.duration_seconds)}
+            </Text>
+            <Text style={styles.statLabel}>Duration</Text>
           </View>
         </View>
 
@@ -185,7 +295,7 @@ export default function Dashboard() {
             style={styles.primaryCtaGrad}
           >
             <Text style={styles.primaryCtaText}>Start a Walk</Text>
-            <Ionicons name="walk-outline" size={22} color={colors.text} />
+            <Text style={styles.walkIcon}>🚶</Text>
           </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity
@@ -193,7 +303,7 @@ export default function Dashboard() {
           onPress={() => router.push('/start-group-walk')}
           activeOpacity={0.8}
         >
-          <Ionicons name="people-outline" size={18} color={colors.text} />
+          <Text style={styles.btnIcon}>👥</Text>
           <Text style={styles.secondaryCtaText}>Start Group Walk</Text>
         </TouchableOpacity>
 
@@ -202,7 +312,7 @@ export default function Dashboard() {
           onPress={() => router.push('/friends')}
           activeOpacity={0.8}
         >
-          <Ionicons name="person-add-outline" size={18} color={colors.text} />
+          <Text style={styles.btnIcon}>+</Text>
           <Text style={styles.secondaryCtaText}>Find Friends</Text>
         </TouchableOpacity>
 
@@ -211,20 +321,78 @@ export default function Dashboard() {
           <>
             <Text style={styles.sectionTitle}>My Group Walks</Text>
             {groupWalks.map(session => (
-              <TouchableOpacity
-                key={session.id}
-                style={styles.planCard}
-                onPress={() => router.push({ pathname: '/walk-timer', params: { sessionId: session.id } })}
-                activeOpacity={0.85}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.planName}>{session.name || 'Group Walk'}</Text>
-                  <Text style={styles.planMeta}>
-                    {session.status === 'active' ? '🟢 Active' : session.status === 'completed' ? '✅ Completed' : '📅 Scheduled'} · {new Date(session.created_at).toLocaleDateString()}
-                  </Text>
-                </View>
-                <Ionicons name="people" size={20} color={colors.accent} />
-              </TouchableOpacity>
+              <View key={session.id} style={styles.groupWalkContainer}>
+                <TouchableOpacity
+                  style={styles.planCard}
+                  onPress={() => router.push({ pathname: '/walk-timer', params: { sessionId: session.id } })}
+                  activeOpacity={0.85}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.planName}>{session.name || 'Group Walk'}</Text>
+                    <Text style={styles.planMeta}>
+                      {session.status === 'active' ? '🟢 Active' : session.status === 'completed' ? '✅ Completed' : '📅 Scheduled'} · {new Date(session.created_at).toLocaleDateString()}
+                    </Text>
+                    {/* Participant Avatars */}
+                    {session.participants && session.participants.length > 0 && (
+                      <View style={styles.participantsRow}>
+                        {session.participants.slice(0, 5).map((participant, idx) => (
+                          <View key={participant.user_id} style={[styles.participantAvatar, idx > 0 && { marginLeft: -8 }]}>
+                            {participant.avatar_url ? (
+                              <Image
+                                source={{ uri: participant.avatar_url }}
+                                style={styles.participantAvatarImage}
+                              />
+                            ) : (
+                              <View style={styles.participantAvatarPlaceholder}>
+                                <Text style={styles.participantAvatarText}>
+                                  {participant.username?.charAt(0).toUpperCase() || '?'}
+                                </Text>
+                              </View>
+                            )}
+                            {idx === 0 && (
+                              <View style={styles.hostBadge}>
+                                <Text style={styles.hostBadgeText}>👑</Text>
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                        {session.participants.length > 5 && (
+                          <View style={[styles.participantAvatar, { marginLeft: -8 }]}>
+                            <View style={styles.participantAvatarPlaceholder}>
+                              <Text style={styles.participantAvatarText}>+{session.participants.length - 5}</Text>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.groupIcon}>👥</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.inviteBtn}
+                  onPress={async () => {
+                    // Get invite token
+                    const { data } = await supabase
+                      .from('session_invites')
+                      .select('token')
+                      .eq('session_id', session.id)
+                      .single();
+                    if (data) {
+                      const link = `https://walks.wearesparklab.com/join/${data.token}`;
+                      if (Platform.OS === 'web') {
+                        try {
+                          await navigator.clipboard.writeText(link);
+                          window.alert('Invite link copied!\n\n' + link);
+                        } catch {
+                          window.alert('Invite link:\n\n' + link);
+                        }
+                      }
+                    }
+                  }}
+                >
+                  <Text style={styles.inviteBtnText}>📤 Invite</Text>
+                </TouchableOpacity>
+              </View>
             ))}
           </>
         )}
@@ -279,13 +447,13 @@ export default function Dashboard() {
                   {Math.floor(plan.intervals.reduce((s, i) => s + i.minutes * 60 + i.seconds, 0) / 60)} min · {plan.intervals.length} intervals
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.sub} />
+              <Text style={styles.chevronIcon}>›</Text>
             </TouchableOpacity>
           ))
         )}
 
         <TouchableOpacity style={styles.createButton} onPress={() => router.push('/create-walk')} activeOpacity={0.85}>
-          <Ionicons name="add" size={22} color={colors.accent} />
+          <Text style={styles.plusIcon}>+</Text>
           <Text style={styles.createText}>Create a New Walk</Text>
         </TouchableOpacity>
 
@@ -301,6 +469,7 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 26, fontWeight: '800' },
   subtitle: { color: colors.sub, marginTop: 6 },
   settingsButton: { padding: 8, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  settingsIcon: { fontSize: 20 },
   content: { flex: 1 },
   statsRow: { flexDirection: 'row', gap: 14, marginBottom: 22 },
   statCard: {
@@ -332,4 +501,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)',
   },
   createText: { color: colors.accent, fontWeight: '700' },
+  chevronIcon: { color: colors.sub, fontSize: 24, fontWeight: '300' },
+  plusIcon: { color: colors.accent, fontSize: 24, fontWeight: '600' },
+  walkIcon: { fontSize: 22 },
+  btnIcon: { fontSize: 18 },
+  groupIcon: { color: colors.accent, fontSize: 20 },
+  groupWalkContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  inviteBtn: { backgroundColor: colors.accent + '20', borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.accent + '40' },
+  inviteBtnText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
+  periodSelector: { flexDirection: 'row', gap: 8, marginBottom: 18 },
+  periodBtn: { flex: 1, backgroundColor: colors.card, borderRadius: radius.md, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: colors.line },
+  periodBtnActive: { backgroundColor: colors.accent + '20', borderColor: colors.accent },
+  periodText: { color: colors.sub, fontSize: 14, fontWeight: '600' },
+  periodTextActive: { color: colors.accent },
+  participantsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  participantAvatar: { width: 32, height: 32, borderRadius: 16, position: 'relative', borderWidth: 2, borderColor: colors.bg },
+  participantAvatarImage: { width: '100%', height: '100%', borderRadius: 16 },
+  participantAvatarPlaceholder: { width: '100%', height: '100%', borderRadius: 16, backgroundColor: colors.accent + '30', alignItems: 'center', justifyContent: 'center' },
+  participantAvatarText: { color: colors.text, fontSize: 12, fontWeight: '700' },
+  hostBadge: { position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
+  hostBadgeText: { fontSize: 10 },
 });

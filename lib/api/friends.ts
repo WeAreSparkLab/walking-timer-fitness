@@ -95,12 +95,30 @@ export async function listIncomingFriendRequests() {
 
   const { data, error } = await supabase
     .from('friendships')
-    .select('*, requester:profiles!friendships_requester_id_fkey(id,username,avatar_url)')
+    .select('*')
     .eq('addressee_id', user.id)
     .eq('status', 'pending');
   if (error) throw error;
 
-  return data as (Friendship & {
+  if (!data || data.length === 0) return [];
+
+  // Fetch requester profiles separately
+  const requesterIds = data.map(f => f.requester_id);
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .in('id', requesterIds);
+  
+  if (profileError) throw profileError;
+
+  // Create a map of profiles by ID
+  const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+  // Combine friendships with requester profiles
+  return data.map(friendship => ({
+    ...friendship,
+    requester: profileMap.get(friendship.requester_id) || { id: friendship.requester_id, username: null, avatar_url: null }
+  })) as (Friendship & {
     requester: { id: string; username: string | null; avatar_url: string | null };
   })[];
 }
