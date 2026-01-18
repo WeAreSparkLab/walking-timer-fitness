@@ -1,4 +1,4 @@
-import { Stack, useRouter, Head } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../lib/theme';
 import { useEffect } from 'react';
@@ -10,6 +10,31 @@ import { requestNotificationPermission } from '../lib/webNotifications';
 
 export default function RootLayout() {
   const router = useRouter();
+
+  // Inject manifest link into document head
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      // Add manifest link
+      const manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.href = '/manifest.webmanifest';
+      document.head.appendChild(manifestLink);
+      
+      // Add theme color
+      const themeColor = document.createElement('meta');
+      themeColor.name = 'theme-color';
+      themeColor.content = '#8A2BE2';
+      document.head.appendChild(themeColor);
+      
+      // Add apple touch icon
+      const appleIcon = document.createElement('link');
+      appleIcon.rel = 'apple-touch-icon';
+      appleIcon.href = '/icon-192.png';
+      document.head.appendChild(appleIcon);
+      
+      console.log('✅ Manifest link injected into document head');
+    }
+  }, []);
 
   // Register service worker for PWA
   useEffect(() => {
@@ -62,11 +87,6 @@ export default function RootLayout() {
 
   return (
     <>
-      <Head>
-        <link rel="manifest" href="/manifest.webmanifest" />
-        <meta name="theme-color" content="#8A2BE2" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
-      </Head>
       <StatusBar style="light" backgroundColor={colors.bg} />
       <Stack
         screenOptions={{
