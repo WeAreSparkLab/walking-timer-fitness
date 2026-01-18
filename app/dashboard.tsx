@@ -122,19 +122,21 @@ export default function Dashboard() {
 
   const handleShareSocial = (platform: string, link: string, walkName: string) => {
     const text = `Join my group walk: ${walkName}`;
-    const encodedText = encodeURIComponent(text);
+    const message = `${text} ${link}`;
+    const encodedMessage = encodeURIComponent(message);
     const encodedUrl = encodeURIComponent(link);
+    const encodedText = encodeURIComponent(text);
     
     let url = '';
     switch (platform) {
       case 'whatsapp':
-        url = `https://wa.me/?text=${encodedText}%20${encodedUrl}`;
+        url = `https://wa.me/?text=${encodedMessage}`;
         break;
       case 'facebook':
-        url = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+        url = `https://www.facebook.com/dialog/send?link=${encodedUrl}&app_id=0&redirect_uri=${encodeURIComponent(window.location.href)}`;
         break;
       case 'twitter':
-        url = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
+        url = `https://twitter.com/messages/compose?text=${encodedMessage}`;
         break;
       case 'telegram':
         url = `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`;

@@ -114,10 +114,10 @@ export default function StartGroupWalk() {
         url = `https://wa.me/?text=${message}`;
         break;
       case 'facebook':
-        url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(inviteLink)}`;
+        url = `https://www.facebook.com/dialog/send?link=${encodeURIComponent(inviteLink)}&app_id=0&redirect_uri=${encodeURIComponent(window.location.href)}`;
         break;
       case 'twitter':
-        url = `https://twitter.com/intent/tweet?text=${message}`;
+        url = `https://twitter.com/messages/compose?text=${message}`;
         break;
       case 'telegram':
         url = `https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent('Join my walk on Spark Walk!')}`;
