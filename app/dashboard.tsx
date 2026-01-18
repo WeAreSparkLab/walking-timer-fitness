@@ -665,17 +665,17 @@ export default function Dashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: pad.lg },
+  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: Platform.OS === 'web' ? 0 : pad.lg },
   bgGlow: { position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
-  hero: { flexDirection: 'row', alignItems: 'center', paddingTop: 56, paddingBottom: 18 },
+  hero: { flexDirection: 'row', alignItems: 'center', paddingTop: 56, paddingBottom: 18, paddingHorizontal: Platform.OS === 'web' ? pad.xl : 0, maxWidth: 800, width: '100%', alignSelf: 'center' },
   title: { color: colors.text, fontSize: 26, fontWeight: '800' },
   subtitle: { color: colors.sub, marginTop: 6 },
   settingsButton: { padding: 8, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
   settingsIcon: { fontSize: 20 },
-  content: { flex: 1 },
-  statsRow: { flexDirection: 'row', gap: 14, marginBottom: 22 },
+  content: { flex: 1, paddingHorizontal: Platform.OS === 'web' ? pad.xl : 0, maxWidth: 800, width: '100%', alignSelf: 'center' },
+  statsRow: { flexDirection: 'row', gap: 16, marginBottom: 24 },
   statCard: {
-    flex: 1, backgroundColor: colors.card, borderRadius: radius.lg, padding: pad.md,
+    flex: 1, backgroundColor: colors.card, borderRadius: radius.lg, padding: pad.lg,
     borderWidth: 1, borderColor: colors.line, alignItems: 'center',
   },
   statNumber: { color: colors.text, fontSize: 28, fontWeight: '800' },
@@ -690,8 +690,8 @@ const styles = StyleSheet.create({
   secondaryCtaText: { color: colors.text, fontWeight: '700' },
   sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: 12 },
   planCard: {
-    backgroundColor: colors.card, borderRadius: radius.md, padding: pad.md, borderWidth: 1, borderColor: colors.line,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10,
+    backgroundColor: colors.card, borderRadius: radius.lg, padding: pad.lg, borderWidth: 1, borderColor: colors.line,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12,
   },
   planName: { color: colors.text, fontSize: 16, fontWeight: '600' },
   planMeta: { color: colors.sub, marginTop: 4, fontSize: 12 },
@@ -713,11 +713,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, 
     borderWidth: 1, 
     borderColor: colors.line,
-    marginBottom: 12,
+    marginBottom: 16,
     overflow: 'hidden',
   },
   groupWalkContent: {
-    padding: pad.md,
+    padding: pad.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
