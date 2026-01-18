@@ -45,14 +45,23 @@ export default function InstallPrompt() {
   }, []);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+      console.log('No deferred prompt available - showing instructions');
+      // If no prompt available, show instructions
+      alert('To install:\n\n1. Open your browser menu (⋮ or ⋯)\n2. Select "Install app" or "Add to Home Screen"');
+      return;
+    }
 
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User response to install prompt: ${outcome}`);
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to install prompt: ${outcome}`);
 
-    setDeferredPrompt(null);
-    setShowPrompt(false);
+      setDeferredPrompt(null);
+      setShowPrompt(false);
+    } catch (error) {
+      console.error('Install prompt error:', error);
+    }
   };
 
   const handleDismiss = () => {
@@ -118,7 +127,7 @@ export default function InstallPrompt() {
               onPress={handleInstall}
               activeOpacity={0.8}
             >
-              <Text style={styles.installText}>Install</Text>
+              <Text style={styles.installText}>{deferredPrompt ? 'Install' : 'How to Install'}</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.button, styles.dismissButton]} 
