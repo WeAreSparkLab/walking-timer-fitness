@@ -209,7 +209,7 @@ export default function StartGroupWalk() {
     }
   };
 
-  if (inviteLink && sessionId) {
+  if (inviteLink && sessionId && !editId) {
     return (
       <View style={styles.container}>
         <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
