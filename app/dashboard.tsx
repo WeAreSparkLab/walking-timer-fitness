@@ -835,7 +835,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   copyLinkBtn: {
-    padding: pad.sm,
+    padding: 10,
     backgroundColor: colors.accent,
     borderRadius: radius.sm,
     alignItems: 'center',
@@ -843,7 +843,7 @@ const styles = StyleSheet.create({
     marginBottom: pad.sm,
   },
   copyLinkText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: colors.text,
   },
