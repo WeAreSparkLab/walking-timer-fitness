@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad } from '../../lib/theme';
 import { redeemInviteToken } from '../../lib/api/invites';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function JoinByToken() {
   const { token } = useLocalSearchParams<{ token?: string }>();
@@ -13,18 +14,44 @@ export default function JoinByToken() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+    
     (async () => {
       try {
         if (!token) throw new Error('No token');
+        
+        // Wait for authentication to be ready
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session && mounted) {
+          // User not logged in, redirect to login with return path
+          router.replace({
+            pathname: '/',
+            params: { redirect: `/join/${token}` }
+          });
+          return;
+        }
+        
+        if (!mounted) return;
+        
         const sessionId = await redeemInviteToken(token);
-        router.replace({ pathname: '/walk-timer', params: { sessionId } });
+        if (mounted) {
+          router.replace({ pathname: '/walk-timer', params: { sessionId } });
+        }
       } catch (e: any) {
-        setError(e.message ?? 'Could not join session');
-        setTimeout(() => router.replace('/dashboard'), 3000);
+        if (mounted) {
+          setError(e.message ?? 'Could not join session');
+          setTimeout(() => {
+            if (mounted) router.replace('/dashboard');
+          }, 3000);
+        }
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     })();
+    
+    return () => {
+      mounted = false;
+    };
   }, [token]);
 
   return (
