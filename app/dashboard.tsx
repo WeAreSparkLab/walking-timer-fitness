@@ -552,7 +552,7 @@ export default function Dashboard() {
                 >
                   <View style={styles.socialIcon}>
                     <Image 
-                      source={require('../../assets/social-icons/whatsapp.svg')}
+                      source={{ uri: '/social/whatsapp.png' }}
                       style={styles.socialIconImage}
                     />
                   </View>
@@ -570,7 +570,7 @@ export default function Dashboard() {
                 >
                   <View style={styles.socialIcon}>
                     <Image 
-                      source={require('../../assets/social-icons/facebook.svg')}
+                      source={{ uri: '/social/facebook.png' }}
                       style={styles.socialIconImage}
                     />
                   </View>
@@ -588,7 +588,7 @@ export default function Dashboard() {
                 >
                   <View style={styles.socialIcon}>
                     <Image 
-                      source={require('../../assets/social-icons/instagram.svg')}
+                      source={{ uri: '/social/instagram.png' }}
                       style={styles.socialIconImage}
                     />
                   </View>
@@ -606,7 +606,7 @@ export default function Dashboard() {
                 >
                   <View style={styles.socialIcon}>
                     <Image 
-                      source={require('../../assets/social-icons/telegram.svg')}
+                      source={{ uri: '/social/telegram.png' }}
                       style={styles.socialIconImage}
                     />
                   </View>
