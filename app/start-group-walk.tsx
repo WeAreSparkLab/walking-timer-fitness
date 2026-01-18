@@ -230,8 +230,11 @@ export default function StartGroupWalk() {
                     style={styles.socialBtn}
                     onPress={() => handleShareSocial('whatsapp')}
                   >
-                    <View style={[styles.socialIcon, { backgroundColor: '#25D366' }]}>
-                      <Text style={[styles.socialEmoji, { fontSize: 32 }]}>💬</Text>
+                    <View style={styles.socialIcon}>
+                      <Image 
+                        source={require('../../assets/social-icons/whatsapp.svg')}
+                        style={styles.socialIconImage}
+                      />
                     </View>
                     <Text style={styles.socialLabel}>WhatsApp</Text>
                   </TouchableOpacity>
@@ -240,8 +243,11 @@ export default function StartGroupWalk() {
                     style={styles.socialBtn}
                     onPress={() => handleShareSocial('facebook')}
                   >
-                    <View style={[styles.socialIcon, { backgroundColor: '#1877F2' }]}>
-                      <Text style={[styles.socialEmoji, { fontSize: 40, fontWeight: '900' }]}>f</Text>
+                    <View style={styles.socialIcon}>
+                      <Image 
+                        source={require('../../assets/social-icons/facebook.svg')}
+                        style={styles.socialIconImage}
+                      />
                     </View>
                     <Text style={styles.socialLabel}>Facebook</Text>
                   </TouchableOpacity>
@@ -250,14 +256,12 @@ export default function StartGroupWalk() {
                     style={styles.socialBtn}
                     onPress={() => handleShareSocial('instagram')}
                   >
-                    <LinearGradient
-                      colors={['#833AB4', '#E1306C', '#FD1D1D', '#FCAF45']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.socialIcon}
-                    >
-                      <Text style={styles.socialEmoji}>📷</Text>
-                    </LinearGradient>
+                    <View style={styles.socialIcon}>
+                      <Image 
+                        source={require('../../assets/social-icons/instagram.svg')}
+                        style={styles.socialIconImage}
+                      />
+                    </View>
                     <Text style={styles.socialLabel}>Instagram</Text>
                   </TouchableOpacity>
 
@@ -265,8 +269,11 @@ export default function StartGroupWalk() {
                     style={styles.socialBtn}
                     onPress={() => handleShareSocial('telegram')}
                   >
-                    <View style={[styles.socialIcon, { backgroundColor: '#0088cc' }]}>
-                      <Text style={[styles.socialEmoji, { fontSize: 30 }]}>✈️</Text>
+                    <View style={styles.socialIcon}>
+                      <Image 
+                        source={require('../../assets/social-icons/telegram.svg')}
+                        style={styles.socialIconImage}
+                      />
                     </View>
                     <Text style={styles.socialLabel}>Telegram</Text>
                   </TouchableOpacity>
@@ -707,5 +714,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.text,
+  },
+
+  socialIconImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
 });
