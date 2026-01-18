@@ -1,4 +1,4 @@
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, Head } from "expo-router";
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../lib/theme';
 import { useEffect } from 'react';
@@ -62,6 +62,11 @@ export default function RootLayout() {
 
   return (
     <>
+      <Head>
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#8A2BE2" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </Head>
       <StatusBar style="light" backgroundColor={colors.bg} />
       <Stack
         screenOptions={{
