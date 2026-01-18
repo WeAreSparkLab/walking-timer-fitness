@@ -41,15 +41,6 @@ export default function InstallPrompt() {
       setTimeout(() => setShowPrompt(true), 3000);
     }
 
-    const handler = (e: Event) => {
-      e.preventDefault();
-      console.log('beforeinstallprompt event fired');
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setShowPrompt(true);
-    };
-
-    window.addEventListener('beforeinstallprompt', handler);
-
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
     };
