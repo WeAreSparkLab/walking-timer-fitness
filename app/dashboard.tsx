@@ -389,9 +389,9 @@ export default function Dashboard() {
           <>
             <Text style={styles.sectionTitle}>My Group Walks</Text>
             {groupWalks.map(session => (
-              <View key={session.id} style={styles.groupWalkContainer}>
+              <View key={session.id} style={styles.groupWalkCard}>
                 <TouchableOpacity
-                  style={styles.planCard}
+                  style={styles.groupWalkContent}
                   onPress={() => router.push({ pathname: '/walk-timer', params: { sessionId: session.id } })}
                   activeOpacity={0.85}
                 >
@@ -436,7 +436,7 @@ export default function Dashboard() {
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  style={styles.inviteBtn}
+                  style={styles.inviteBtnIntegrated}
                   onPress={async () => {
                     // Get invite token
                     const { data } = await supabase
@@ -451,7 +451,7 @@ export default function Dashboard() {
                     }
                   }}
                 >
-                  <Text style={styles.inviteBtnText}>📤 Invite</Text>
+                  <Text style={styles.inviteBtnTextIntegrated}>📤 Invite</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -706,7 +706,33 @@ const styles = StyleSheet.create({
   walkIcon: { fontSize: 22 },
   btnIcon: { fontSize: 18 },
   groupIcon: { color: colors.accent, fontSize: 20 },
-  groupWalkContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  groupWalkCard: { 
+    backgroundColor: colors.card, 
+    borderRadius: radius.md, 
+    borderWidth: 1, 
+    borderColor: colors.line,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  groupWalkContent: {
+    padding: pad.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  inviteBtnIntegrated: { 
+    backgroundColor: colors.accent + '15', 
+    paddingVertical: 10,
+    paddingHorizontal: pad.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.accent + '20',
+    alignItems: 'center',
+  },
+  inviteBtnTextIntegrated: { 
+    color: colors.accent, 
+    fontSize: 13, 
+    fontWeight: '700',
+  },
   inviteBtn: { backgroundColor: colors.accent + '20', borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.accent + '40' },
   inviteBtnText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
   periodSelector: { flexDirection: 'row', gap: 8, marginBottom: 18 },
