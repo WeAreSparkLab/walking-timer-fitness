@@ -551,7 +551,7 @@ export default function Dashboard() {
                   }}
                 >
                   <View style={[styles.socialIcon, { backgroundColor: '#25D366' }]}>
-                    <Text style={styles.socialEmoji}>💬</Text>
+                    <Text style={[styles.socialEmoji, { fontSize: 32 }]}>💬</Text>
                   </View>
                   <Text style={styles.socialLabel}>WhatsApp</Text>
                 </TouchableOpacity>
@@ -566,7 +566,7 @@ export default function Dashboard() {
                   }}
                 >
                   <View style={[styles.socialIcon, { backgroundColor: '#1877F2' }]}>
-                    <Text style={styles.socialEmoji}>f</Text>
+                    <Text style={[styles.socialEmoji, { fontSize: 40, fontWeight: '900' }]}>f</Text>
                   </View>
                   <Text style={styles.socialLabel}>Facebook</Text>
                 </TouchableOpacity>
@@ -580,9 +580,14 @@ export default function Dashboard() {
                     }
                   }}
                 >
-                  <View style={[styles.socialIcon, { backgroundColor: '#E4405F' }]}>
+                  <LinearGradient
+                    colors={['#833AB4', '#E1306C', '#FD1D1D', '#FCAF45']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.socialIcon}
+                  >
                     <Text style={styles.socialEmoji}>📷</Text>
-                  </View>
+                  </LinearGradient>
                   <Text style={styles.socialLabel}>Instagram</Text>
                 </TouchableOpacity>
 
@@ -596,7 +601,7 @@ export default function Dashboard() {
                   }}
                 >
                   <View style={[styles.socialIcon, { backgroundColor: '#0088cc' }]}>
-                    <Text style={styles.socialEmoji}>✈️</Text>
+                    <Text style={[styles.socialEmoji, { fontSize: 30 }]}>✈️</Text>
                   </View>
                   <Text style={styles.socialLabel}>Telegram</Text>
                 </TouchableOpacity>
