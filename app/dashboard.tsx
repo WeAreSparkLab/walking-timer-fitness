@@ -319,18 +319,26 @@ export default function Dashboard() {
 
         {/* Stats */}
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, shadow.card]}>
+          <TouchableOpacity 
+            style={[styles.statCard, shadow.card]} 
+            onPress={() => router.push('/leaderboard')}
+            activeOpacity={0.7}
+          >
             <Text style={styles.statNumber}>
               {selectedPeriod === 'all' && (stats?.total_points || 0)}
               {selectedPeriod === 'month' && monthlyStats.points}
               {selectedPeriod === 'week' && weeklyStats.points}
             </Text>
             <Text style={styles.statLabel}>Points</Text>
-          </View>
-          <View style={[styles.statCard, shadow.card]}>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.statCard, shadow.card]} 
+            onPress={() => router.push('/leaderboard')}
+            activeOpacity={0.7}
+          >
             <Text style={styles.statNumber}>{stats?.current_streak_days || 0}</Text>
             <Text style={styles.statLabel}>Day Streak</Text>
-          </View>
+          </TouchableOpacity>
         </View>
         <View style={styles.statsRow}>
           <View style={[styles.statCard, shadow.card]}>
