@@ -584,9 +584,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
-    paddingTop: pad.md,
-    paddingBottom: 32,
-    maxHeight: '75%',
+    paddingTop: pad.sm,
+    paddingBottom: pad.lg,
+    maxHeight: '65%',
   },
 
   shareModalHeader: {
@@ -623,12 +623,12 @@ const styles = StyleSheet.create({
   },
 
   shareSection: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.text,
     opacity: 0.6,
-    marginTop: pad.md,
-    marginBottom: pad.sm,
+    marginTop: pad.sm,
+    marginBottom: 6,
   },
 
   socialGrid: {
@@ -669,49 +669,50 @@ const styles = StyleSheet.create({
   friendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: pad.md,
+    padding: pad.sm,
     backgroundColor: colors.bg,
-    borderRadius: radius.md,
-    marginBottom: pad.sm,
+    borderRadius: radius.sm,
+    marginBottom: 6,
   },
 
   friendAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: pad.md,
+    marginRight: pad.sm,
   },
 
   friendInitial: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
     color: colors.text,
   },
 
   friendName: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.text,
   },
 
   friendShareIcon: {
-    fontSize: 20,
+    fontSize: 18,
   },
 
   copyLinkBtn: {
-    padding: pad.md,
+    padding: pad.sm,
     backgroundColor: colors.accent,
-    borderRadius: radius.md,
+    borderRadius: radius.sm,
     alignItems: 'center',
-    marginTop: pad.sm,
+    marginTop: 6,
+    marginBottom: pad.sm,
   },
 
   copyLinkText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: colors.text,
   },
