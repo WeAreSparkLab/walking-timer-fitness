@@ -41,6 +41,7 @@ export default function Dashboard() {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [selectedSession, setSelectedSession] = useState<{ id: string; token: string; name: string } | null>(null);
   const [friends, setFriends] = useState<Array<{ id: string; username: string; avatar_url?: string }>>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Check authentication on mount
   useEffect(() => {
@@ -49,6 +50,7 @@ export default function Dashboard() {
         router.replace('/');
       } else {
         setIsAuthenticated(true);
+        setCurrentUserId(session.user.id);
         // Load data after confirming authentication
         loadInitialData();
       }
@@ -61,6 +63,7 @@ export default function Dashboard() {
         router.replace('/');
       } else {
         setIsAuthenticated(true);
+        setCurrentUserId(session.user.id);
         loadInitialData();
       }
     });
@@ -444,24 +447,34 @@ export default function Dashboard() {
                   </View>
                 </TouchableOpacity>
                 <View style={styles.inviteBtnWrapper}>
-                  <TouchableOpacity 
-                    style={styles.inviteBtnIntegrated}
-                    onPress={async () => {
-                      // Get invite token
-                      const { data } = await supabase
-                        .from('session_invites')
-                        .select('token')
-                        .eq('session_id', session.id)
-                        .single();
-                      if (data) {
-                        const link = `https://walks.wearesparklab.com/join/${data.token}`;
-                        setSelectedSession({ id: session.id, token: data.token, name: session.name || 'Group Walk' });
-                        setShareModalVisible(true);
-                      }
-                    }}
-                  >
-                    <Text style={styles.inviteBtnTextIntegrated}>📤 Invite Friends</Text>
-                  </TouchableOpacity>
+                  <View style={styles.groupWalkActions}>
+                    {session.host_id === currentUserId && session.status === 'scheduled' && (
+                      <TouchableOpacity
+                        style={styles.editBtn}
+                        onPress={() => router.push({ pathname: '/start-group-walk', params: { editId: session.id } })}
+                      >
+                        <Text style={styles.editBtnText}>✏️ Edit</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity 
+                      style={styles.inviteBtnIntegrated}
+                      onPress={async () => {
+                        // Get invite token
+                        const { data } = await supabase
+                          .from('session_invites')
+                          .select('token')
+                          .eq('session_id', session.id)
+                          .single();
+                        if (data) {
+                          const link = `https://walks.wearesparklab.com/join/${data.token}`;
+                          setSelectedSession({ id: session.id, token: data.token, name: session.name || 'Group Walk' });
+                          setShareModalVisible(true);
+                        }
+                      }}
+                    >
+                      <Text style={styles.inviteBtnTextIntegrated}>📤 Invite Friends</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             ))}
@@ -518,6 +531,17 @@ export default function Dashboard() {
                   {Math.floor(plan.intervals.reduce((s, i) => s + i.minutes * 60 + i.seconds, 0) / 60)} min · {plan.intervals.length} intervals
                 </Text>
               </View>
+              {plan.id !== 'default-plan' && (
+                <TouchableOpacity
+                  style={styles.editIconBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    router.push({ pathname: '/create-walk', params: { editId: plan.id } });
+                  }}
+                >
+                  <Ionicons name="pencil" size={18} color={colors.accent} />
+                </TouchableOpacity>
+              )}
               <Text style={styles.chevronIcon}>›</Text>
             </TouchableOpacity>
           ))
@@ -716,6 +740,12 @@ const styles = StyleSheet.create({
   walkIcon: { fontSize: 22 },
   btnIcon: { fontSize: 18 },
   groupIcon: { color: colors.accent, fontSize: 20 },
+  editIconBtn: {
+    padding: 6,
+    marginLeft: 8,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accent + '10',
+  },
   groupWalkCard: { 
     backgroundColor: colors.card, 
     borderRadius: radius.lg, 
@@ -734,7 +764,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     paddingTop: 1,
   },
+  groupWalkActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editBtn: {
+    flex: 1,
+    backgroundColor: colors.card,
+    paddingVertical: 12,
+    paddingHorizontal: pad.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: colors.line,
+  },
+  editBtnText: {
+    color: colors.sub,
+    fontSize: 13,
+    fontWeight: '600',
+  },
   inviteBtnIntegrated: { 
+    flex: 2,
     backgroundColor: colors.accent + '10', 
     paddingVertical: 12,
     paddingHorizontal: pad.md,
