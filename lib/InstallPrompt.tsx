@@ -22,6 +22,12 @@ export default function InstallPrompt() {
       (navigator as any)?.standalone === true;
     setIsStandalone(standalone);
 
+    console.log('🔍 PWA Debug:', {
+      isStandalone: standalone,
+      userAgent: navigator.userAgent.substring(0, 50),
+      dismissed: localStorage.getItem('pwa-install-dismissed')
+    });
+
     // Check if already dismissed
     const alreadyDismissed =
       typeof localStorage !== 'undefined' &&
@@ -30,7 +36,7 @@ export default function InstallPrompt() {
     // Listen for the beforeinstallprompt event
     const handler = (e: Event) => {
       e.preventDefault();
-      console.log('✅ beforeinstallprompt event fired');
+      console.log('✅ beforeinstallprompt event fired - app is installable!');
       const promptEvent = e as BeforeInstallPromptEvent;
       setDeferredPrompt(promptEvent);
       if (!alreadyDismissed) {
@@ -45,9 +51,18 @@ export default function InstallPrompt() {
     window.addEventListener('beforeinstallprompt', handler);
     window.addEventListener('appinstalled', onInstalled);
 
+    // TEST MODE: Show prompt after 3 seconds regardless of event (for debugging)
+    const testTimer = setTimeout(() => {
+      console.log('🧪 Test mode: Showing prompt. Event fired:', !!deferredPrompt);
+      if (!alreadyDismissed && !standalone) {
+        setShowPrompt(true);
+      }
+    }, 3000);
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
       window.removeEventListener('appinstalled', onInstalled);
+      clearTimeout(testTimer);
     };
   }, []);
 
@@ -93,46 +108,17 @@ export default function InstallPrompt() {
         
         <Text style={styles.title}>Install Spark Walk</Text>
         <Text style={styles.description}>
-          {isIOS 
-            ? 'Get the full app experience! Follow these steps to install:'
-            : 'Install this app on your device for quick access and a better experience!'
-          }
+          Install this app on your device for quick access and a better experience!
+          {!deferredPrompt && '\n\n🧪 Test Mode: Event not fired yet'}
         </Text>
         
-        {isIOS ? (
-          <View style={styles.iosInstructions}>
-            <View style={styles.instructionRow}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>1</Text>
-              </View>
-              <View style={styles.instructionContent}>
-                <Text style={styles.instructionText}>Tap the Share button</Text>
-                <Ionicons name="share-outline" size={24} color={colors.accent} style={{ marginLeft: 8 }} />
-              </View>
-            </View>
-            <View style={styles.instructionRow}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>2</Text>
-              </View>
-              <View style={styles.instructionContent}>
-                <Text style={styles.instructionText}>Scroll and select "Add to Home Screen"</Text>
-              </View>
-            </View>
-            <TouchableOpacity 
-              style={[styles.button, styles.dismissButton]} 
-              onPress={handleDismiss}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.dismissText}>Got it!</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.buttons}>
-            <TouchableOpacity 
-              style={[styles.button, styles.installButton]} 
-              onPress={handleInstall}
-              activeOpacity={0.8}
-            >
+        <View style={styles.buttons}>
+          <TouchableOpacity 
+            style={[styles.button, styles.installButton, !deferredPrompt && styles.disabledButton]} 
+            onPress={handleInstall}
+            activeOpacity={0.8}
+            disabled={!deferredPrompt}
+          >
               <Text style={styles.installText}>Install</Text>
             </TouchableOpacity>
             <TouchableOpacity 
@@ -255,6 +241,10 @@ const styles = StyleSheet.create({
   },
   installButton: {
     backgroundColor: colors.accent,
+  },
+  disabledButton: {
+    backgroundColor: colors.line,
+    opacity: 0.5,
   },
   installText: {
     color: colors.text,
