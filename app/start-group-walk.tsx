@@ -5,11 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad, radius } from '../lib/theme';
 import { getPlans } from '../lib/storage';
-import { createSession, createInvite, startSession } from '../lib/api/sessions';
+import { createSession, createInvite, startSession, getSession, updateSession } from '../lib/api/sessions';
 import { listMyFriends } from '../lib/api/friends';
+import { supabase } from '../lib/supabaseClient';
 
 export default function StartGroupWalk() {
   const router = useRouter();
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
   const [sessionName, setSessionName] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [plans, setPlans] = useState<any[]>([]);
@@ -29,6 +31,41 @@ export default function StartGroupWalk() {
     ]);
     setPlans(plansData);
     setFriends(friendsData);
+
+    // Load existing session if editing
+    if (editId) {
+      try {
+        const session = await getSession(editId);
+        setSessionId(session.id);
+        setSessionName(session.name || '');
+        // Find matching plan or create temporary plan from session
+        const matchingPlan = plansData.find(p => 
+          JSON.stringify(p.intervals) === JSON.stringify(session.plan)
+        );
+        if (matchingPlan) {
+          setSelectedPlan(matchingPlan);
+        } else {
+          // Create a temporary plan object from session data
+          setSelectedPlan({
+            id: 'session-plan',
+            name: 'Session Plan',
+            intervals: session.plan
+          });
+        }
+        
+        // Get invite token
+        const { data } = await supabase.from('session_invites')
+          .select('token')
+          .eq('session_id', session.id)
+          .single();
+        if (data) {
+          const link = `https://walks.wearesparklab.com/join/${data.token}`;
+          setInviteLink(link);
+        }
+      } catch (error) {
+        console.error('Failed to load session:', error);
+      }
+    }
   };
 
   const handleCreateSession = async () => {
@@ -52,29 +89,44 @@ export default function StartGroupWalk() {
     }
 
     try {
-      console.log('Creating session...', { name: sessionName, intervals: selectedPlan.intervals });
-      const session = await createSession(sessionName, selectedPlan.intervals);
-      console.log('Session created:', session);
-      setSessionId(session.id);
-      
-      // Generate invite token
-      console.log('Creating invite...');
-      const token = await createInvite(session.id);
-      console.log('Invite token:', token);
-      const link = `https://walks.wearesparklab.com/join/${token}`;
-      setInviteLink(link);
-      
-      if (Platform.OS === 'web') {
-        window.alert('Session created! Share the invite link with your friends');
+      if (editId && sessionId) {
+        // Update existing session
+        console.log('Updating session...', { id: sessionId, name: sessionName, intervals: selectedPlan.intervals });
+        await updateSession(sessionId, sessionName, selectedPlan.intervals);
+        console.log('Session updated');
+        
+        if (Platform.OS === 'web') {
+          window.alert('Group walk updated!');
+        } else {
+          Alert.alert('Updated!', 'Group walk has been updated');
+        }
+        router.back();
       } else {
-        Alert.alert('Session Created!', 'Share the invite link with your friends');
+        // Create new session
+        console.log('Creating session...', { name: sessionName, intervals: selectedPlan.intervals });
+        const session = await createSession(sessionName, selectedPlan.intervals);
+        console.log('Session created:', session);
+        setSessionId(session.id);
+        
+        // Generate invite token
+        console.log('Creating invite...');
+        const token = await createInvite(session.id);
+        console.log('Invite token:', token);
+        const link = `https://walks.wearesparklab.com/join/${token}`;
+        setInviteLink(link);
+        
+        if (Platform.OS === 'web') {
+          window.alert('Session created! Share the invite link with your friends');
+        } else {
+          Alert.alert('Session Created!', 'Share the invite link with your friends');
+        }
       }
     } catch (error) {
-      console.error('Failed to create session:', error);
+      console.error('Failed to save session:', error);
       if (Platform.OS === 'web') {
-        window.alert(`Error: Failed to create session - ${error.message || error}`);
+        window.alert(`Error: Failed to save session - ${error.message || error}`);
       } else {
-        Alert.alert('Error', 'Failed to create session');
+        Alert.alert('Error', 'Failed to save session');
       }
     }
   };
@@ -328,7 +380,7 @@ export default function StartGroupWalk() {
         <TouchableOpacity onPress={() => router.replace('/dashboard')} style={styles.iconBtn}>
           <Text style={styles.iconText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Start Group Walk</Text>
+        <Text style={styles.headerTitle}>{editId ? 'Edit Group Walk' : 'Start Group Walk'}</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -386,7 +438,7 @@ export default function StartGroupWalk() {
             end={{ x: 1, y: 0.5 }} 
             style={styles.createBtn}
           >
-            <Text style={styles.createBtnText}>Create Session</Text>
+            <Text style={styles.createBtnText}>{editId ? 'Update Group Walk' : 'Create Session'}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
