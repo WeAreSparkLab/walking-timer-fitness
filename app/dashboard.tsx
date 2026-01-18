@@ -504,7 +504,7 @@ export default function Dashboard() {
               }}
               activeOpacity={0.85}
             >
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, alignItems: 'center' }}>
                 <Text style={styles.planName}>{plan.name}</Text>
                 <Text style={styles.planMeta}>
                   {Math.floor(plan.intervals.reduce((s, i) => s + i.minutes * 60 + i.seconds, 0) / 60)} min · {plan.intervals.length} intervals
@@ -691,7 +691,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700', marginBottom: 12 },
   planCard: {
     backgroundColor: colors.card, borderRadius: radius.lg, padding: pad.lg, borderWidth: 1, borderColor: colors.line,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12,
   },
   planName: { color: colors.text, fontSize: 16, fontWeight: '600' },
   planMeta: { color: colors.sub, marginTop: 4, fontSize: 12 },
