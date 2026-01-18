@@ -766,7 +766,6 @@ const styles = StyleSheet.create({
   },
   groupWalkActions: {
     flexDirection: 'row',
-    gap: 8,
   },
   editBtn: {
     flex: 1,
@@ -784,7 +783,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   inviteBtnIntegrated: { 
-    flex: 2,
+    flex: 1,
     backgroundColor: colors.accent + '10', 
     paddingVertical: 12,
     paddingHorizontal: pad.md,
