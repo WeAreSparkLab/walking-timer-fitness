@@ -212,8 +212,8 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.iconBtn}>
+          <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
         <View style={{ width: 36 }} />
@@ -226,7 +226,7 @@ export default function ProfileScreen() {
           <View style={{ gap: 8 }}>
             <Text style={styles.hint}>You’re signed in.</Text>
             <TouchableOpacity onPress={doSignOut} disabled={authBusy} style={styles.outlineBtn}>
-              <Ionicons name="log-out-outline" size={16} color={colors.text} />
+              <Text style={styles.btnIcon}>➤</Text>
               <Text style={styles.outlineBtnText}>{authBusy ? 'Signing out…' : 'Sign out'}</Text>
             </TouchableOpacity>
           </View>
@@ -256,7 +256,7 @@ export default function ProfileScreen() {
                 </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity onPress={doSignUp} disabled={authBusy} style={styles.outlineBtn}>
-                <Ionicons name="person-add-outline" size={16} color={colors.text} />
+                <Text style={styles.btnIcon}>+</Text>
                 <Text style={styles.outlineBtnText}>Create account</Text>
               </TouchableOpacity>
             </View>
@@ -269,11 +269,11 @@ export default function ProfileScreen() {
         <View style={styles.avatarWrap}>
           {avatarUrl
             ? <Image source={{ uri: avatarUrl }} style={styles.avatar} />
-            : <Ionicons name="person-circle-outline" size={72} color={colors.sub} />
+            : <Text style={styles.avatarPlaceholder}>👤</Text>
           }
         </View>
         <TouchableOpacity onPress={pickPhoto} style={styles.pickBtn} activeOpacity={0.85}>
-          <Ionicons name="image-outline" size={16} color={colors.accent} />
+          <Text style={styles.pickIcon}>📷</Text>
           <Text style={styles.pickText}>Pick Photo</Text>
         </TouchableOpacity>
       </View>
@@ -319,6 +319,8 @@ const styles = StyleSheet.create({
   bgGlow: { position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
   header: { paddingTop: 56, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
+  backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  backIcon: { color: colors.text, fontSize: 24 },
   iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
 
   sectionLabel: { color: colors.text, fontWeight: '800', marginBottom: 8 },
@@ -349,6 +351,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)', flexDirection: 'row', alignItems: 'center', gap: 8,
   },
   pickText: { color: colors.accent, fontWeight: '700' },
+  btnIcon: { color: colors.text, fontSize: 16 },
+  avatarPlaceholder: { fontSize: 72, opacity: 0.6 },
+  pickIcon: { color: colors.accent, fontSize: 16 },
 
   saveBtn: { borderRadius: radius.md, paddingVertical: 14, alignItems: 'center' },
   saveText: { color: colors.text, fontWeight: '800' },

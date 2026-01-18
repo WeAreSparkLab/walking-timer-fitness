@@ -61,8 +61,8 @@ export default function CreateWalk() {
     <View style={styles.container}>
       <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.iconBtn}>
+          <Text style={styles.iconText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{editId ? 'Edit Walk' : 'Create Walk'}</Text>
         <View style={{ width: 36 }} />
@@ -124,7 +124,7 @@ export default function CreateWalk() {
               </View>
 
               <TouchableOpacity onPress={() => removeInterval(idx)} style={styles.trashBtn}>
-                <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                <Text style={[styles.iconText, { color: colors.danger, fontSize: 18 }]}>🗑</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -152,6 +152,7 @@ const styles = StyleSheet.create({
   header: { paddingTop: 56, paddingHorizontal: pad.lg, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
   iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  iconText: { color: colors.text, fontSize: 20 },
 
   block: {
     backgroundColor: colors.card, borderRadius: radius.lg, padding: pad.md, borderWidth: 1, borderColor: colors.line, marginBottom: 16,

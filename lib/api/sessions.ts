@@ -25,9 +25,9 @@ export async function createSession(name: string, plan: IntervalDTO[]) {
     .single();
   if (error) throw error;
 
-  // host joins as participant
+  // host joins as participant (role will default to 'member', but host_id in sessions table identifies the host)
   const { error: participantError } = await supabase.from('session_participants')
-    .insert({ session_id: data.id, user_id: user.id, role: 'host' });
+    .insert({ session_id: data.id, user_id: user.id });
   
   if (participantError) {
     console.error('Failed to insert participant:', participantError);
@@ -170,4 +170,73 @@ export function subscribeToProgress(sessionId: string, onChange: (progress: Sess
     .subscribe();
 
   return () => { supabase.removeChannel(channel); };
+}
+
+export async function deleteSession(sessionId: string) {
+  const { error } = await supabase
+    .from('sessions')
+    .delete()
+    .eq('id', sessionId);
+  
+  if (error) throw error;
+}
+
+export async function updateSession(sessionId: string, name: string, plan: IntervalDTO[]) {
+  const { error } = await supabase
+    .from('sessions')
+    .update({ 
+      name, 
+      plan: plan.map(i => ({ pace: i.pace, minutes: i.minutes, seconds: i.seconds }))
+    })
+    .eq('id', sessionId);
+  
+  if (error) throw error;
+}
+
+export async function updateSessionControl(sessionId: string, isRunning: boolean, currentInterval: number, timeRemaining: number) {
+  console.log('updateSessionControl called:', { sessionId, isRunning, currentInterval, timeRemaining });
+  const { data, error } = await supabase
+    .from('sessions')
+    .update({ 
+      status: isRunning ? 'active' : 'scheduled',
+      start_time: isRunning ? new Date().toISOString() : null,
+      current_interval: currentInterval,
+      time_remaining: timeRemaining
+    })
+    .eq('id', sessionId)
+    .select();
+  
+  if (error) {
+    console.error('updateSessionControl error:', error);
+    throw error;
+  }
+  console.log('updateSessionControl success:', data);
+}
+
+export function subscribeToSessionControl(sessionId: string, onChange: (data: { isRunning: boolean; currentInterval: number; timeRemaining: number }) => void) {
+  console.log('subscribeToSessionControl for session:', sessionId);
+  const channel = supabase
+    .channel(`session-control:${sessionId}`)
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'sessions',
+      filter: `id=eq.${sessionId}`,
+    }, (payload) => {
+      console.log('Session control change received:', payload);
+      const session = payload.new as Session;
+      onChange({
+        isRunning: session.status === 'active',
+        currentInterval: (session as any).current_interval || 0,
+        timeRemaining: (session as any).time_remaining || 0
+      });
+    })
+    .subscribe((status) => {
+      console.log('Subscription status:', status);
+    });
+
+  return () => { 
+    console.log('Unsubscribing from session control');
+    supabase.removeChannel(channel); 
+  };
 }

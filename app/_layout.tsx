@@ -4,9 +4,41 @@ import { colors } from '../lib/theme';
 import { useEffect } from 'react';
 import { addNotificationResponseListener } from '../lib/notifications';
 import type { NotificationResponse } from 'expo-notifications';
+import InstallPrompt from '../lib/InstallPrompt';
+import { Platform } from 'react-native';
+import { requestNotificationPermission } from '../lib/webNotifications';
 
 export default function RootLayout() {
   const router = useRouter();
+
+  // Register service worker for PWA
+  useEffect(() => {
+    if (Platform.OS === 'web' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('Service Worker registered:', registration);
+        })
+        .catch((error) => {
+          console.error('Service Worker registration failed:', error);
+        });
+    }
+  }, []);
+
+  // Request notification permission after first user interaction
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const requestPermission = async () => {
+        // Wait a bit for user to interact with the app first
+        setTimeout(async () => {
+          const granted = await requestNotificationPermission();
+          if (granted) {
+            console.log('Notification permission granted');
+          }
+        }, 3000);
+      };
+      requestPermission();
+    }
+  }, []);
 
   // Handle notification taps
   useEffect(() => {
@@ -44,6 +76,7 @@ export default function RootLayout() {
         <Stack.Screen name="create-walk" />
         <Stack.Screen name="profile" />
       </Stack>
+      <InstallPrompt />
     </>
   );
 }

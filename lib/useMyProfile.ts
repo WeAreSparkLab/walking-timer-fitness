@@ -6,6 +6,7 @@ import { getMyProfile } from './api/profile';
 import { loadLocalProfile } from './profileLocal';
 
 export function useMyProfile() {
+  const [id, setId] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -17,6 +18,7 @@ export function useMyProfile() {
         if (session) {
           const p = await getMyProfile().catch(() => null);
           if (alive && p) {
+            setId(p.id);
             setUsername(p.username ?? null);
             setAvatarUrl(p.avatar_url ?? null);
             return;
@@ -24,6 +26,7 @@ export function useMyProfile() {
         }
         const lp = await loadLocalProfile();
         if (alive && lp) {
+          setId(lp.id ?? null);
           setUsername(lp.username ?? null);
           setAvatarUrl(lp.avatar_url ?? null);
         }
@@ -32,5 +35,5 @@ export function useMyProfile() {
     }, [])
   );
 
-  return { username, avatarUrl };
+  return { id, username, avatarUrl, profile: { id, username, avatar_url: avatarUrl } };
 }
