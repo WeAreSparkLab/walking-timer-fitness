@@ -11,39 +11,43 @@ interface BeforeInstallPromptEvent extends Event {
 export default function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
-    // Only show on web
     if (Platform.OS !== 'web') return;
 
-    // Check if already installed - don't show if in standalone mode
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      console.log('App is already installed');
-      return;
-    }
+    // Check if already installed
+    const standalone =
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      (navigator as any)?.standalone === true;
+    setIsStandalone(standalone);
 
-    // Detect iOS
-    const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    setIsIOS(iOS);
+    // Check if already dismissed
+    const alreadyDismissed =
+      typeof localStorage !== 'undefined' &&
+      localStorage.getItem('pwa-install-dismissed') === '1';
 
-    // For Chrome/Edge, listen for beforeinstallprompt event
+    // Listen for the beforeinstallprompt event
     const handler = (e: Event) => {
       e.preventDefault();
-      console.log('✅ beforeinstallprompt event fired - app is installable!');
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      console.log('✅ beforeinstallprompt event fired');
+      const promptEvent = e as BeforeInstallPromptEvent;
+      setDeferredPrompt(promptEvent);
+      if (!alreadyDismissed) {
+        setShowPrompt(true);
+      }
+    };
+
+    const onInstalled = () => {
+      setShowPrompt(false);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
-
-    // Always show prompt after delay for testing (will show instructions if not installable)
-    setTimeout(() => {
-      console.log('Showing install prompt. iOS:', iOS, 'Has deferred prompt:', !!deferredPrompt);
-      setShowPrompt(true);
-    }, 3000);
+    window.addEventListener('appinstalled', onInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', onInstalled);
     };
   }, []);
 
@@ -54,26 +58,24 @@ export default function InstallPrompt() {
     }
 
     try {
-      console.log('Triggering install prompt...');
       await deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      console.log(`User response to install prompt: ${outcome}`);
-
-      if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-        setShowPrompt(false);
-      }
+      console.log(`User ${outcome} the install prompt`);
+      
+      setShowPrompt(false);
+      localStorage.setItem('pwa-install-dismissed', '1');
+      setDeferredPrompt(null);
     } catch (error) {
-      console.error('Install prompt error:', error);
+      console.error('Error showing install prompt:', error);
     }
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    // Don't persist dismissal - prompt will show again on next visit
+    localStorage.setItem('pwa-install-dismissed', '1');
   };
 
-  if (!showPrompt) return null;
+  if (Platform.OS !== 'web' || isStandalone || !showPrompt) return null;
 
   return (
     <View style={styles.container}>
