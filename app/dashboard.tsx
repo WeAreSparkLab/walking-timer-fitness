@@ -434,7 +434,6 @@ export default function Dashboard() {
                       </View>
                     )}
                   </View>
-                  <Text style={styles.groupIcon}>👥</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.inviteBtn}
