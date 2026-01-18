@@ -584,21 +584,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
-    paddingTop: pad.lg,
-    paddingBottom: 40,
-    maxHeight: '80%',
+    paddingTop: pad.md,
+    paddingBottom: 32,
+    maxHeight: '75%',
   },
 
   shareModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: pad.lg,
-    marginBottom: pad.md,
+    paddingHorizontal: pad.md,
+    marginBottom: pad.sm,
   },
 
   shareModalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: colors.text,
   },
@@ -619,39 +619,39 @@ const styles = StyleSheet.create({
   },
 
   shareModalScroll: {
-    paddingHorizontal: pad.lg,
+    paddingHorizontal: pad.md,
   },
 
   shareSection: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: colors.text,
     opacity: 0.6,
-    marginTop: pad.lg,
-    marginBottom: pad.md,
+    marginTop: pad.md,
+    marginBottom: pad.sm,
   },
 
   socialGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: pad.md,
+    gap: pad.sm,
   },
 
   socialBtn: {
     width: '47%',
     alignItems: 'center',
-    padding: pad.md,
+    padding: pad.sm,
     backgroundColor: colors.bg,
     borderRadius: radius.md,
   },
 
   socialIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: pad.sm,
+    marginBottom: pad.xs,
   },
 
   socialEmoji: {
@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
   },
 
   socialLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: colors.text,
   },
@@ -717,8 +717,8 @@ const styles = StyleSheet.create({
   },
 
   socialIconImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
 });
