@@ -27,22 +27,20 @@ export default function InstallPrompt() {
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(iOS);
 
-    // For iOS, show instructions after delay
-    if (iOS) {
-      setTimeout(() => setShowPrompt(true), 3000);
-      return;
-    }
-
     // For Chrome/Edge, listen for beforeinstallprompt event
     const handler = (e: Event) => {
       e.preventDefault();
-      console.log('beforeinstallprompt event fired - app is installable!');
+      console.log('✅ beforeinstallprompt event fired - app is installable!');
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      // Show prompt after a short delay
-      setTimeout(() => setShowPrompt(true), 2000);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
+
+    // Always show prompt after delay for testing (will show instructions if not installable)
+    setTimeout(() => {
+      console.log('Showing install prompt. iOS:', iOS, 'Has deferred prompt:', !!deferredPrompt);
+      setShowPrompt(true);
+    }, 3000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
