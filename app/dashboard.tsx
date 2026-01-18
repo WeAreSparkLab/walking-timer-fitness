@@ -1,12 +1,13 @@
 //app/dashboard.tsx
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Image, Modal } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, pad, shadow } from '../lib/theme';
 import { getPlans, removePlan, WalkPlan } from '../lib/storage';
 import { createAndShareInvite } from '../lib/actions/invites';
+import { listMyFriends } from '../lib/api/friends';
 import { useMyProfile } from '../lib/useMyProfile';
 import { supabase } from '../lib/supabaseClient';
 import { Platform } from 'react-native';
@@ -37,6 +38,9 @@ export default function Dashboard() {
   const [monthlyStats, setMonthlyStats] = useState<PeriodStats>({ points: 0, walks: 0, duration_seconds: 0 });
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'all'>('all');
   const { username, avatarUrl } = useMyProfile();
+  const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<{ id: string; token: string; name: string } | null>(null);
+  const [friends, setFriends] = useState<Array<{ id: string; username: string; avatar_url?: string }>>([]);
 
   // Check authentication on mount
   useEffect(() => {
@@ -71,6 +75,22 @@ export default function Dashboard() {
     setPlans(plans);
     await loadGroupWalks();
     await loadStats();
+    await loadFriends();
+  };
+
+  const loadFriends = async () => {
+    try {
+      const { data } = await listMyFriends();
+      if (data) {
+        setFriends(data.map(f => ({
+          id: f.friend.id,
+          username: f.friend.username || 'User',
+          avatar_url: f.friend.avatar_url
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to load friends:', error);
+    }
   };
 
   const loadStats = async () => {
@@ -86,6 +106,50 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Failed to load stats:', error);
     }
+  };
+
+  const handleCopyLink = async (link: string) => {
+    if (Platform.OS === 'web') {
+      try {
+        await navigator.clipboard.writeText(link);
+        window.alert('Invite link copied to clipboard!');
+      } catch (err) {
+        console.error('Failed to copy:', err);
+        window.alert(`Invite link:\n\n${link}`);
+      }
+    }
+  };
+
+  const handleShareSocial = (platform: string, link: string, walkName: string) => {
+    const text = `Join my group walk: ${walkName}`;
+    const encodedText = encodeURIComponent(text);
+    const encodedUrl = encodeURIComponent(link);
+    
+    let url = '';
+    switch (platform) {
+      case 'whatsapp':
+        url = `https://wa.me/?text=${encodedText}%20${encodedUrl}`;
+        break;
+      case 'facebook':
+        url = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+        break;
+      case 'twitter':
+        url = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
+        break;
+      case 'telegram':
+        url = `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`;
+        break;
+    }
+    
+    if (url && Platform.OS === 'web') {
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleShareToFriend = async (friendId: string, friendName: string, link: string) => {
+    await handleCopyLink(link);
+    window.alert(`Link copied! Now you can send it to ${friendName}`);
+    setShareModalVisible(false);
   };
 
   async function handleCreateGroupWalk() {
@@ -379,14 +443,8 @@ export default function Dashboard() {
                       .single();
                     if (data) {
                       const link = `https://walks.wearesparklab.com/join/${data.token}`;
-                      if (Platform.OS === 'web') {
-                        try {
-                          await navigator.clipboard.writeText(link);
-                          window.alert('Invite link copied!\n\n' + link);
-                        } catch {
-                          window.alert('Invite link:\n\n' + link);
-                        }
-                      }
+                      setSelectedSession({ id: session.id, token: data.token, name: session.name || 'Group Walk' });
+                      setShareModalVisible(true);
                     }
                   }}
                 >
@@ -458,6 +516,133 @@ export default function Dashboard() {
         </TouchableOpacity>
 
       </ScrollView>
+
+      {/* Share Modal */}
+      <Modal
+        visible={shareModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShareModalVisible(false)}
+      >
+        <View style={styles.shareModalOverlay}>
+          <View style={styles.shareModalContent}>
+            <View style={styles.shareModalHeader}>
+              <Text style={styles.shareModalTitle}>Share Walk Invite</Text>
+              <TouchableOpacity onPress={() => setShareModalVisible(false)} style={styles.shareModalClose}>
+                <Text style={styles.shareModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.shareModalScroll}>
+              {/* Social Media Options */}
+              <Text style={styles.shareSection}>Social Media</Text>
+              <View style={styles.socialGrid}>
+                <TouchableOpacity 
+                  style={styles.socialBtn}
+                  onPress={() => {
+                    if (selectedSession) {
+                      const link = `https://walks.wearesparklab.com/join/${selectedSession.token}`;
+                      handleShareSocial('whatsapp', link, selectedSession.name);
+                    }
+                  }}
+                >
+                  <View style={[styles.socialIcon, { backgroundColor: '#25D366' }]}>
+                    <Text style={styles.socialEmoji}>💬</Text>
+                  </View>
+                  <Text style={styles.socialLabel}>WhatsApp</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.socialBtn}
+                  onPress={() => {
+                    if (selectedSession) {
+                      const link = `https://walks.wearesparklab.com/join/${selectedSession.token}`;
+                      handleShareSocial('facebook', link, selectedSession.name);
+                    }
+                  }}
+                >
+                  <View style={[styles.socialIcon, { backgroundColor: '#1877F2' }]}>
+                    <Text style={styles.socialEmoji}>f</Text>
+                  </View>
+                  <Text style={styles.socialLabel}>Facebook</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.socialBtn}
+                  onPress={() => {
+                    if (selectedSession) {
+                      const link = `https://walks.wearesparklab.com/join/${selectedSession.token}`;
+                      handleShareSocial('twitter', link, selectedSession.name);
+                    }
+                  }}
+                >
+                  <View style={[styles.socialIcon, { backgroundColor: '#1DA1F2' }]}>
+                    <Text style={styles.socialEmoji}>𝕏</Text>
+                  </View>
+                  <Text style={styles.socialLabel}>Twitter</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.socialBtn}
+                  onPress={() => {
+                    if (selectedSession) {
+                      const link = `https://walks.wearesparklab.com/join/${selectedSession.token}`;
+                      handleShareSocial('telegram', link, selectedSession.name);
+                    }
+                  }}
+                >
+                  <View style={[styles.socialIcon, { backgroundColor: '#0088cc' }]}>
+                    <Text style={styles.socialEmoji}>✈️</Text>
+                  </View>
+                  <Text style={styles.socialLabel}>Telegram</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Friends List */}
+              {friends.length > 0 && (
+                <>
+                  <Text style={styles.shareSection}>Your Friends</Text>
+                  {friends.map((friend) => (
+                    <TouchableOpacity
+                      key={friend.id}
+                      style={styles.friendItem}
+                      onPress={() => {
+                        if (selectedSession) {
+                          const link = `https://walks.wearesparklab.com/join/${selectedSession.token}`;
+                          handleShareToFriend(friend.id, friend.username, link);
+                        }
+                      }}
+                    >
+                      <View style={styles.friendAvatar}>
+                        <Text style={styles.friendInitial}>
+                          {friend.username.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={styles.friendName}>{friend.username}</Text>
+                      <Text style={styles.friendShareIcon}>📤</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+
+              {/* Copy Link */}
+              <Text style={styles.shareSection}>Or Copy Link</Text>
+              <TouchableOpacity 
+                style={styles.copyLinkBtn}
+                onPress={() => {
+                  if (selectedSession) {
+                    const link = `https://walks.wearesparklab.com/join/${selectedSession.token}`;
+                    handleCopyLink(link);
+                    setShareModalVisible(false);
+                  }
+                }}
+              >
+                <Text style={styles.copyLinkText}>📋 Copy Invite Link</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -521,4 +706,128 @@ const styles = StyleSheet.create({
   participantAvatarText: { color: colors.text, fontSize: 12, fontWeight: '700' },
   hostBadge: { position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   hostBadgeText: { fontSize: 10 },
+
+  // Share Modal Styles
+  shareModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  shareModalContent: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingTop: pad.lg,
+    paddingBottom: 40,
+    maxHeight: '80%',
+  },
+  shareModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: pad.lg,
+    marginBottom: pad.md,
+  },
+  shareModalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  shareModalClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shareModalCloseText: {
+    fontSize: 20,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  shareModalScroll: {
+    paddingHorizontal: pad.lg,
+  },
+  shareSection: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    opacity: 0.6,
+    marginTop: pad.lg,
+    marginBottom: pad.md,
+  },
+  socialGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: pad.md,
+  },
+  socialBtn: {
+    width: '47%',
+    alignItems: 'center',
+    padding: pad.md,
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+  },
+  socialIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: pad.sm,
+  },
+  socialEmoji: {
+    fontSize: 28,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  socialLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  friendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: pad.md,
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    marginBottom: pad.sm,
+  },
+  friendAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: pad.md,
+  },
+  friendInitial: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  friendName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  friendShareIcon: {
+    fontSize: 20,
+  },
+  copyLinkBtn: {
+    padding: pad.md,
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    marginTop: pad.sm,
+  },
+  copyLinkText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
 });
