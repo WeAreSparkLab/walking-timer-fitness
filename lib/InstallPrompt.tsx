@@ -17,27 +17,32 @@ export default function InstallPrompt() {
     // Only show on web
     if (Platform.OS !== 'web') return;
 
-    // TESTING: Show for all users
-    // if (window.matchMedia('(display-mode: standalone)').matches) {
-    //   console.log('App is already installed');
-    //   return;
-    // }
+    // Check if already installed - don't show if in standalone mode
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      console.log('App is already installed');
+      return;
+    }
 
     // Detect iOS
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(iOS);
 
+    // For iOS, show instructions after delay
+    if (iOS) {
+      setTimeout(() => setShowPrompt(true), 3000);
+      return;
+    }
+
+    // For Chrome/Edge, listen for beforeinstallprompt event
     const handler = (e: Event) => {
       e.preventDefault();
-      console.log('beforeinstallprompt event fired');
+      console.log('beforeinstallprompt event fired - app is installable!');
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setShowPrompt(true);
+      // Show prompt after a short delay
+      setTimeout(() => setShowPrompt(true), 2000);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
-
-    // Show prompt after a delay for all browsers (for testing)
-    setTimeout(() => setShowPrompt(true), 3000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
@@ -46,19 +51,20 @@ export default function InstallPrompt() {
 
   const handleInstall = async () => {
     if (!deferredPrompt) {
-      console.log('No deferred prompt available - showing instructions');
-      // If no prompt available, show instructions
-      alert('To install:\n\n1. Open your browser menu (⋮ or ⋯)\n2. Select "Install app" or "Add to Home Screen"');
+      console.log('No deferred prompt available');
       return;
     }
 
     try {
+      console.log('Triggering install prompt...');
       await deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       console.log(`User response to install prompt: ${outcome}`);
 
-      setDeferredPrompt(null);
-      setShowPrompt(false);
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+        setShowPrompt(false);
+      }
     } catch (error) {
       console.error('Install prompt error:', error);
     }
@@ -127,7 +133,7 @@ export default function InstallPrompt() {
               onPress={handleInstall}
               activeOpacity={0.8}
             >
-              <Text style={styles.installText}>{deferredPrompt ? 'Install' : 'How to Install'}</Text>
+              <Text style={styles.installText}>Install</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.button, styles.dismissButton]} 
