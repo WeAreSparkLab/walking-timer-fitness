@@ -23,10 +23,6 @@ export default function InstallPrompt() {
       return;
     }
 
-    // Check if user has dismissed the prompt before
-    const dismissed = localStorage.getItem('pwa-install-dismissed');
-    if (dismissed) return;
-
     // Detect iOS
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(iOS);
@@ -63,7 +59,7 @@ export default function InstallPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem('pwa-install-dismissed', 'true');
+    // Don't persist dismissal - prompt will show again on next visit
   };
 
   if (!showPrompt) return null;
