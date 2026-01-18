@@ -17,20 +17,18 @@ export default function InstallPrompt() {
     // Only show on web
     if (Platform.OS !== 'web') return;
 
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      console.log('App is already installed');
-      return;
-    }
+    // TESTING: Commented out so prompt shows for everyone
+    // if (window.matchMedia('(display-mode: standalone)').matches) {
+    //   console.log('App is already installed');
+    //   return;
+    // }
 
     // Detect iOS
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(iOS);
 
-    // Show prompt for iOS after a delay
-    if (iOS) {
-      setTimeout(() => setShowPrompt(true), 3000);
-    }
+    // Show prompt for iOS after a delay (or all devices for testing)
+    setTimeout(() => setShowPrompt(true), 3000);
 
     const handler = (e: Event) => {
       e.preventDefault();
