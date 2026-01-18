@@ -6,7 +6,7 @@
   "framework": null,
   "headers": [
     {
-      "source": "/manifest.json",
+      "source": "/manifest.webmanifest",
       "headers": [
         {
           "key": "Content-Type",
@@ -26,8 +26,8 @@
   ],
   "rewrites": [
     {
-      "source": "/manifest.json",
-      "destination": "/manifest.json"
+      "source": "/manifest.webmanifest",
+      "destination": "/manifest.webmanifest"
     },
     {
       "source": "/sw.js",
