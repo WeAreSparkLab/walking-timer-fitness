@@ -395,7 +395,7 @@ export default function Dashboard() {
                   onPress={() => router.push({ pathname: '/walk-timer', params: { sessionId: session.id } })}
                   activeOpacity={0.85}
                 >
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, alignItems: 'center' }}>
                     <Text style={styles.planName}>{session.name || 'Group Walk'}</Text>
                     <Text style={styles.planMeta}>
                       {session.status === 'active' ? '🟢 Active' : session.status === 'completed' ? '✅ Completed' : '📅 Scheduled'} · {new Date(session.created_at).toLocaleDateString()}
@@ -720,7 +720,7 @@ const styles = StyleSheet.create({
     padding: pad.lg,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
   inviteBtnWrapper: {
     backgroundColor: colors.bg,
