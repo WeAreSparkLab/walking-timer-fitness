@@ -435,24 +435,26 @@ export default function Dashboard() {
                     )}
                   </View>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.inviteBtnIntegrated}
-                  onPress={async () => {
-                    // Get invite token
-                    const { data } = await supabase
-                      .from('session_invites')
-                      .select('token')
-                      .eq('session_id', session.id)
-                      .single();
-                    if (data) {
-                      const link = `https://walks.wearesparklab.com/join/${data.token}`;
-                      setSelectedSession({ id: session.id, token: data.token, name: session.name || 'Group Walk' });
-                      setShareModalVisible(true);
-                    }
-                  }}
-                >
-                  <Text style={styles.inviteBtnTextIntegrated}>📤 Invite</Text>
-                </TouchableOpacity>
+                <View style={styles.inviteBtnWrapper}>
+                  <TouchableOpacity 
+                    style={styles.inviteBtnIntegrated}
+                    onPress={async () => {
+                      // Get invite token
+                      const { data } = await supabase
+                        .from('session_invites')
+                        .select('token')
+                        .eq('session_id', session.id)
+                        .single();
+                      if (data) {
+                        const link = `https://walks.wearesparklab.com/join/${data.token}`;
+                        setSelectedSession({ id: session.id, token: data.token, name: session.name || 'Group Walk' });
+                        setShareModalVisible(true);
+                      }
+                    }}
+                  >
+                    <Text style={styles.inviteBtnTextIntegrated}>📤 Invite Friends</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))}
           </>
@@ -708,10 +710,10 @@ const styles = StyleSheet.create({
   groupIcon: { color: colors.accent, fontSize: 20 },
   groupWalkCard: { 
     backgroundColor: colors.card, 
-    borderRadius: radius.md, 
+    borderRadius: radius.lg, 
     borderWidth: 1, 
     borderColor: colors.line,
-    marginBottom: 10,
+    marginBottom: 12,
     overflow: 'hidden',
   },
   groupWalkContent: {
@@ -720,18 +722,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  inviteBtnWrapper: {
+    backgroundColor: colors.bg,
+    paddingTop: 1,
+  },
   inviteBtnIntegrated: { 
-    backgroundColor: colors.accent + '15', 
-    paddingVertical: 10,
+    backgroundColor: colors.accent + '10', 
+    paddingVertical: 12,
     paddingHorizontal: pad.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.accent + '20',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   inviteBtnTextIntegrated: { 
     color: colors.accent, 
-    fontSize: 13, 
-    fontWeight: '700',
+    fontSize: 14, 
+    fontWeight: '800',
   },
   inviteBtn: { backgroundColor: colors.accent + '20', borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.accent + '40' },
   inviteBtnText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
