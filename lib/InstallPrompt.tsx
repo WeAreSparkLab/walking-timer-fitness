@@ -257,10 +257,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-  },
-  dismissText: {
-    color: colors.sub,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
