@@ -17,11 +17,11 @@ export default function InstallPrompt() {
     // Only show on web
     if (Platform.OS !== 'web') return;
 
-    // Check if already installed - don't show if in standalone mode
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      console.log('App is already installed');
-      return;
-    }
+    // TESTING: Show for all users
+    // if (window.matchMedia('(display-mode: standalone)').matches) {
+    //   console.log('App is already installed');
+    //   return;
+    // }
 
     // Detect iOS
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
@@ -36,10 +36,8 @@ export default function InstallPrompt() {
 
     window.addEventListener('beforeinstallprompt', handler);
 
-    // Show prompt for iOS after a delay (no beforeinstallprompt event on iOS)
-    if (iOS) {
-      setTimeout(() => setShowPrompt(true), 3000);
-    }
+    // Show prompt after a delay for all browsers (for testing)
+    setTimeout(() => setShowPrompt(true), 3000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
