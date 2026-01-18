@@ -448,7 +448,7 @@ export default function Dashboard() {
                 </TouchableOpacity>
                 <View style={styles.inviteBtnWrapper}>
                   <View style={styles.groupWalkActions}>
-                    {session.host_id === currentUserId && session.status === 'scheduled' && (
+                    {session.host_id === currentUserId && session.status !== 'completed' && (
                       <TouchableOpacity
                         style={styles.editBtn}
                         onPress={() => router.push({ pathname: '/start-group-walk', params: { editId: session.id } })}
