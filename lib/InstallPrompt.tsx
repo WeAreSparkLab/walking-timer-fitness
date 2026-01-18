@@ -23,15 +23,23 @@ export default function InstallPrompt() {
       return;
     }
 
-    // Don't show custom prompt - let browser handle it natively
-    return;
-
     // Detect iOS
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(iOS);
 
-    // Show prompt for iOS after a delay (or all devices for testing)
-    setTimeout(() => setShowPrompt(true), 3000);
+    const handler = (e: Event) => {
+      e.preventDefault();
+      console.log('beforeinstallprompt event fired');
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      setShowPrompt(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    // Show prompt for iOS after a delay (no beforeinstallprompt event on iOS)
+    if (iOS) {
+      setTimeout(() => setShowPrompt(true), 3000);
+    }
 
     const handler = (e: Event) => {
       e.preventDefault();

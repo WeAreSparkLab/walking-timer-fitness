@@ -4,7 +4,7 @@ import { colors } from '../lib/theme';
 import { useEffect } from 'react';
 import { addNotificationResponseListener } from '../lib/notifications';
 import type { NotificationResponse } from 'expo-notifications';
-// import InstallPrompt from '../lib/InstallPrompt'; // Disabled to use native browser install
+import InstallPrompt from '../lib/InstallPrompt';
 import { Platform } from 'react-native';
 import { requestNotificationPermission } from '../lib/webNotifications';
 
@@ -76,7 +76,7 @@ export default function RootLayout() {
         <Stack.Screen name="create-walk" />
         <Stack.Screen name="profile" />
       </Stack>
-      {/* <InstallPrompt /> */}
+      <InstallPrompt />
     </>
   );
 }
