@@ -10,6 +10,7 @@ import { createAndShareInvite } from '../lib/actions/invites';
 import { listMyFriends } from '../lib/api/friends';
 import { useMyProfile } from '../lib/useMyProfile';
 import { supabase } from '../lib/supabaseClient';
+import { sendWalkInviteToFriend } from '../lib/notifications';
 import { Platform } from 'react-native';
 import { getUserStats, getPeriodStats, formatDuration, UserStats, PeriodStats } from '../lib/api/stats';
 

@@ -165,6 +165,64 @@ export async function sendPushNotification(
 }
 
 /**
+ * Send walk invite notification to a specific friend
+ */
+export async function sendWalkInviteToFriend(
+  friendId: string,
+  sessionName: string,
+  inviteLink: string
+): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Get sender's username
+    const { data: senderProfile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .single();
+
+    const senderName = senderProfile?.username || 'Someone';
+
+    // Get friend's push token
+    const { data: friendProfile } = await supabase
+      .from('profiles')
+      .select('push_token')
+      .eq('id', friendId)
+      .single();
+
+    if (!friendProfile?.push_token) {
+      console.log('Friend does not have push notifications enabled');
+      return;
+    }
+
+    // Send push notification
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: friendProfile.push_token,
+        title: '🚶 Walk Invitation',
+        body: `${senderName} invited you to join "${sessionName}"`,
+        data: {
+          type: 'session_invite',
+          inviteLink: inviteLink,
+          sessionName: sessionName,
+        },
+        sound: 'default',
+      }),
+    });
+
+    console.log(`Sent walk invite notification to friend ${friendId}`);
+  } catch (error) {
+    console.error('Error sending walk invite notification:', error);
+  }
+}
+
+/**
  * Notify friends when a user starts a group walk
  */
 export async function notifyFriendsOfGroupWalk(
