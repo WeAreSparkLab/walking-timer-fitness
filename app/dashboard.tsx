@@ -11,6 +11,7 @@ import { listMyFriends } from '../lib/api/friends';
 import { useMyProfile } from '../lib/useMyProfile';
 import { supabase } from '../lib/supabaseClient';
 import { sendWalkInviteToFriend } from '../lib/notifications';
+import { createNotification } from '../lib/api/notifications';
 import { Platform } from 'react-native';
 import { getUserStats, getPeriodStats, formatDuration, UserStats, PeriodStats } from '../lib/api/stats';
 
@@ -157,17 +158,53 @@ export default function Dashboard() {
 
   const handleShareToFriend = async (friendId: string, friendName: string, link: string) => {
     try {
-      // Copy the link to clipboard
+      if (!selectedSession || !profile) return;
+      
+      // Create in-app notification (works on web and mobile)
+      await createNotification(
+        friendId,
+        'walk_invite',
+        '🚶 Walk Invitation',
+        `${profile.username || 'Someone'} invited you to join "${selectedSession.name || 'Group Walk'}"`,
+        {
+          inviteLink: link,
+          sessionId: selectedSession.id,
+          sessionName: selectedSession.name,
+        }
+      );
+      
+      // Also try to send push notification for mobile users
+      try {
+        await sendWalkInviteToFriend(friendId, selectedSession.name || 'Group Walk', link);
+      } catch (pushError) {
+        console.log('Push notification not sent (user may not have mobile app)');
+      }
+      
+      // Copy link as backup
       if (Platform.OS === 'web') {
         await navigator.clipboard.writeText(link);
-        window.alert(`✅ Invite link copied!\n\nSend this link to ${friendName} via your preferred messaging app.`);
       }
+      
+      // Show success message
+      if (Platform.OS === 'web') {
+        window.alert(`✅ Invite sent to ${friendName}!\n\nThey will see the notification when they open the app.\n\nThe link has also been copied to your clipboard.`);
+      }
+      
       setShareModalVisible(false);
     } catch (error) {
-      console.error('Failed to copy link:', error);
-      if (Platform.OS === 'web') {
-        window.alert(`Share this link with ${friendName}:\n\n${link}`);
+      console.error('Failed to send invite:', error);
+      // Fallback to just copying link
+      try {
+        if (Platform.OS === 'web') {
+          await navigator.clipboard.writeText(link);
+          window.alert(`⚠️ Couldn't send notification, but link copied!\n\nSend this to ${friendName} manually.`);
+        }
+      } catch (copyError) {
+        if (Platform.OS === 'web') {
+          window.alert(`Share this link with ${friendName}:\n\n${link}`);
+        }
       }
+      setShareModalVisible(false);
     }
   };
 
