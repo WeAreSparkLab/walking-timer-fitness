@@ -53,32 +53,20 @@ export default function RootLayout() {
   useEffect(() => {
     if (Platform.OS === 'web') {
       const setupNotifications = async () => {
-        // Import dynamically to avoid issues
-        const { subscribeToWebPush } = await import('../lib/webNotifications');
-        
-        // Wait for user to interact with the app
-        setTimeout(async () => {
-          await subscribeToWebPush();
-        }, 5000); // Wait 5 seconds after app loads
+        try {
+          // Import dynamically to avoid issues
+          const { subscribeToWebPush } = await import('../lib/webNotifications');
+          
+          // Wait for user to interact with the app
+          setTimeout(async () => {
+            await subscribeToWebPush();
+          }, 5000); // Wait 5 seconds after app loads
+        } catch (error) {
+          console.error('Failed to setup notifications:', error);
+        }
       };
       
       setupNotifications();
-    }
-  }, []);
-
-  // Request notification permission after first user interaction
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      const requestPermission = async () => {
-        // Wait a bit for user to interact with the app first
-        setTimeout(async () => {
-          const granted = await requestNotificationPermission();
-          if (granted) {
-            console.log('Notification permission granted');
-          }
-        }, 3000);
-      };
-      requestPermission();
     }
   }, []);
 
