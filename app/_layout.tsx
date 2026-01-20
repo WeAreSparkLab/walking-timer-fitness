@@ -49,6 +49,23 @@ export default function RootLayout() {
     }
   }, []);
 
+  // Request web push notification permission after user interaction
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const setupNotifications = async () => {
+        // Import dynamically to avoid issues
+        const { subscribeToWebPush } = await import('../lib/webNotifications');
+        
+        // Wait for user to interact with the app
+        setTimeout(async () => {
+          await subscribeToWebPush();
+        }, 5000); // Wait 5 seconds after app loads
+      };
+      
+      setupNotifications();
+    }
+  }, []);
+
   // Request notification permission after first user interaction
   useEffect(() => {
     if (Platform.OS === 'web') {
