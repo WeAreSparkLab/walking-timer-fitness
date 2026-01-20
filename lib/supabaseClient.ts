@@ -13,3 +13,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     detectSessionInUrl: false,
   },
 });
+
+// Notification Edge Function URL
+export const NOTIFICATION_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/send-notification`;

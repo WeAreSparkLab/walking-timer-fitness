@@ -1,4 +1,4 @@
-import { supabase } from '../supabaseClient';
+import { supabase, NOTIFICATION_FUNCTION_URL } from '../supabaseClient';
 
 export type Notification = {
   id: string;
@@ -10,6 +10,46 @@ export type Notification = {
   read: boolean;
   created_at: string;
 };
+
+/**
+ * Send notification to a user via Edge Function
+ * This handles in-app notifications, web push, and mobile push automatically
+ */
+export async function sendNotificationToUser(
+  userId: string,
+  title: string,
+  body: string,
+  data?: any
+): Promise<boolean> {
+  try {
+    const session = await supabase.auth.getSession();
+    const token = session.data.session?.access_token;
+
+    const response = await fetch(NOTIFICATION_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        userId,
+        title,
+        body,
+        data,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to send notification:', await response.text());
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error sending notification:', error);
+    return false;
+  }
+}
 
 /**
  * Create a notification for a user
