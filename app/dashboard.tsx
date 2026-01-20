@@ -571,8 +571,42 @@ export default function Dashboard() {
             </View>
 
             <ScrollView style={styles.shareModalScroll}>
+              {/* Friends List - Show First */}
+              {friends.length > 0 ? (
+                <>
+                  <Text style={styles.shareSection}>Your Friends</Text>
+                  {friends.map((friend) => (
+                    <TouchableOpacity
+                      key={friend.id}
+                      style={styles.friendItem}
+                      onPress={() => {
+                        if (selectedSession) {
+                          const link = `https://walks.wearesparklab.com/join/${selectedSession.token}`;
+                          handleShareToFriend(friend.id, friend.username, link);
+                        }
+                      }}
+                    >
+                      <View style={styles.friendAvatar}>
+                        <Text style={styles.friendInitial}>
+                          {friend.username.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={styles.friendName}>{friend.username}</Text>
+                      <Text style={styles.friendShareIcon}>📤</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <Text style={styles.shareSection}>Your Friends</Text>
+                  <View style={styles.emptyFriends}>
+                    <Text style={styles.emptyFriendsText}>No friends yet. Add friends to share walks with them!</Text>
+                  </View>
+                </>
+              )}
+
               {/* Social Media Options */}
-              <Text style={styles.shareSection}>Social Media</Text>
+              <Text style={styles.shareSection}>Share via Social Media</Text>
               <View style={styles.socialGrid}>
                 <TouchableOpacity 
                   style={styles.socialBtn}
@@ -646,33 +680,6 @@ export default function Dashboard() {
                   <Text style={styles.socialLabel}>Telegram</Text>
                 </TouchableOpacity>
               </View>
-
-              {/* Friends List */}
-              {friends.length > 0 && (
-                <>
-                  <Text style={styles.shareSection}>Your Friends</Text>
-                  {friends.map((friend) => (
-                    <TouchableOpacity
-                      key={friend.id}
-                      style={styles.friendItem}
-                      onPress={() => {
-                        if (selectedSession) {
-                          const link = `https://walks.wearesparklab.com/join/${selectedSession.token}`;
-                          handleShareToFriend(friend.id, friend.username, link);
-                        }
-                      }}
-                    >
-                      <View style={styles.friendAvatar}>
-                        <Text style={styles.friendInitial}>
-                          {friend.username.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text style={styles.friendName}>{friend.username}</Text>
-                      <Text style={styles.friendShareIcon}>📤</Text>
-                    </TouchableOpacity>
-                  ))}
-                </>
-              )}
 
               {/* Copy Link */}
               <Text style={styles.shareSection}>Or Copy Link</Text>
@@ -920,6 +927,19 @@ const styles = StyleSheet.create({
   },
   friendShareIcon: {
     fontSize: 18,
+  },
+  emptyFriends: {
+    padding: pad.md,
+    backgroundColor: colors.bg,
+    borderRadius: radius.sm,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  emptyFriendsText: {
+    fontSize: 13,
+    color: colors.sub,
+    textAlign: 'center',
   },
   copyLinkBtn: {
     padding: 10,
