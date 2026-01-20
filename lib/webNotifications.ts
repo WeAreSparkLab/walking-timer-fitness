@@ -1,4 +1,5 @@
 // Browser notification utilities for PWA (Web only)
+import { supabase } from './supabaseClient';
 
 export type NotificationType = 
   | 'friend_request'
@@ -12,6 +13,98 @@ interface NotificationData {
   body: string;
   url?: string;
   icon?: string;
+}
+
+/**
+ * Helper to convert VAPID key
+ */
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+/**
+ * Subscribe to web push notifications
+ */
+export async function subscribeToWebPush(): Promise<void> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.log('Web Push not supported');
+    return;
+  }
+
+  try {
+    // Request notification permission first
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      console.log('Notification permission denied');
+      return;
+    }
+
+    // Get service worker registration
+    const registration = await navigator.serviceWorker.ready;
+
+    // Subscribe to push notifications
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(
+        'BEl62iUYgUivxIkv69yViEuiBIa-Ib37J8eN2AIo8KJfCy9o6dKZ5p8X9h5HQNdQgBTj5rD3Q8pTqJYdxbM8XQU'
+      )
+    });
+
+    // Save subscription to database
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from('profiles')
+        .update({ web_push_subscription: subscription.toJSON() })
+        .eq('id', user.id);
+
+      console.log('✅ Web push subscription saved');
+    }
+  } catch (error) {
+    console.error('Failed to subscribe to web push:', error);
+  }
+}
+
+/**
+ * Send web push notification to a user
+ */
+export async function sendWebPushNotification(
+  userId: string,
+  title: string,
+  body: string,
+  data?: any
+): Promise<void> {
+  try {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+      return;
+    }
+
+    // Trigger notification via service worker
+    const registration = await navigator.serviceWorker.ready;
+    await registration.showNotification(title, {
+      body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: data,
+      tag: data?.type || 'notification',
+      requireInteraction: false,
+    });
+
+    console.log('✅ Web notification shown');
+  } catch (error) {
+    console.error('Failed to show web notification:', error);
+  }
 }
 
 /**
