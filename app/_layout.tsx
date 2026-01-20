@@ -54,19 +54,24 @@ export default function RootLayout() {
     if (Platform.OS === 'web') {
       const setupNotifications = async () => {
         try {
-          // Import dynamically to avoid issues
-          const { subscribeToWebPush } = await import('../lib/webNotifications');
-          
           // Wait for user to interact with the app
           setTimeout(async () => {
-            await subscribeToWebPush();
+            try {
+              // Import dynamically to avoid issues
+              const { subscribeToWebPush } = await import('../lib/webNotifications');
+              await subscribeToWebPush();
+            } catch (subError) {
+              console.log('Could not setup web push:', subError);
+            }
           }, 5000); // Wait 5 seconds after app loads
         } catch (error) {
-          console.error('Failed to setup notifications:', error);
+          console.log('Notification setup skipped:', error);
         }
       };
       
-      setupNotifications();
+      setupNotifications().catch(() => {
+        // Silently fail - don't break the app
+      });
     }
   }, []);
 
