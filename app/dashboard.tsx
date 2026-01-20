@@ -83,12 +83,13 @@ export default function Dashboard() {
 
   const loadFriends = async () => {
     try {
-      const { data } = await listMyFriends();
+      const data = await listMyFriends();
+      console.log('Loaded friends:', data);
       if (data) {
         setFriends(data.map(f => ({
-          id: f.friend.id,
-          username: f.friend.username || 'User',
-          avatar_url: f.friend.avatar_url
+          id: f.id,
+          username: f.username || 'User',
+          avatar_url: f.avatar_url
         })));
       }
     } catch (error) {
