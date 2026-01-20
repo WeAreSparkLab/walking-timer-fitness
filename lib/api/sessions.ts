@@ -10,6 +10,8 @@ export type Session = {
   plan: IntervalDTO[];       // stored as jsonb
   start_time: string | null; // ISO
   status: 'scheduled' | 'active' | 'completed' | 'cancelled';
+  current_interval: number;  // For real-time sync
+  time_remaining: number;    // For real-time sync (seconds)
   created_at: string;
   updated_at: string;
 };
@@ -227,8 +229,8 @@ export function subscribeToSessionControl(sessionId: string, onChange: (data: { 
       const session = payload.new as Session;
       onChange({
         isRunning: session.status === 'active',
-        currentInterval: (session as any).current_interval || 0,
-        timeRemaining: (session as any).time_remaining || 0
+        currentInterval: session.current_interval,
+        timeRemaining: session.time_remaining
       });
     })
     .subscribe((status) => {
