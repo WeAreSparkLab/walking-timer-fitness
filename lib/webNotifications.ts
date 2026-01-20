@@ -57,7 +57,7 @@ export async function subscribeToWebPush(): Promise<void> {
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(
-        'BEl62iUYgUivxIkv69yViEuiBIa-Ib37J8eN2AIo8KJfCy9o6dKZ5p8X9h5HQNdQgBTj5rD3Q8pTqJYdxbM8XQU'
+        'BKGexLVJAd9Z0oQQuOBXyFL6ygaNrDpcnRi0Ij80CKpgJHZIXsy07Wo5zhyr8h6RKhNU-5yn4MEr1vFpfgCIpAc'
       )
     });
 
