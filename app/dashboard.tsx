@@ -157,10 +157,10 @@ export default function Dashboard() {
 
   const handleShareToFriend = async (friendId: string, friendName: string, link: string) => {
     try {
-      if (!selectedSession || !profile) return;
+      if (!selectedSession) return;
       
       const walkName = selectedSession.name || 'Group Walk';
-      const senderName = profile.username || 'Someone';
+      const senderName = username || 'Someone';
       
       // Send notification via Edge Function (handles in-app, web push, and mobile push)
       const notificationSent = await sendNotificationToUser(
@@ -171,7 +171,7 @@ export default function Dashboard() {
           type: 'walk_invite',
           session_id: selectedSession.id,
           session_name: selectedSession.name,
-          host_name: profile.username,
+          host_name: username,
           link: link,
         }
       );

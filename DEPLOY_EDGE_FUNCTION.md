@@ -1,25 +1,18 @@
 # Deploy Notification Edge Function to Supabase
 
-## Prerequisites
-- Supabase account
-- Supabase CLI installed: `npm install -g supabase`
+## Method 1: Via Supabase Dashboard (EASIEST - Recommended)
 
-## Steps
+### 1. Open Supabase Dashboard
+Go to https://supabase.com/dashboard/project/lzxiipvflwsckygbovnz
 
-### 1. Login to Supabase CLI
-```bash
-supabase login
-```
+### 2. Navigate to Edge Functions
+- Click "Edge Functions" in the left sidebar
+- Click "Create a new function"
 
-### 2. Link your project
-```bash
-supabase link --project-ref lzxiipvflwsckygbovnz
-```
-
-### 3. Deploy the Edge Function
-```bash
-supabase functions deploy send-notification
-```
+### 3. Create the Function
+- **Function name**: `send-notification`
+- Copy and paste the entire code from `supabase/functions/send-notification/index.ts`
+- Click "Deploy"
 
 ### 4. Set Environment Variables
 
@@ -35,7 +28,30 @@ VAPID_SUBJECT=mailto:your-email@example.com
 
 Replace the email with your actual email.
 
-### 5. Test the Function
+### 5. Done! ✅
+
+The function is now deployed and ready to use. The app will automatically use it when sharing walks to friends.
+
+---
+
+## Method 2: Via Supabase CLI (Alternative)
+
+### Prerequisites
+- Supabase CLI installed via Scoop (Windows):
+  ```powershell
+  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+  scoop install supabase
+  ```
+
+
+### 3. Deploy the Edge Function
+```bash
+supabase functions deploy send-notification
+```
+
+---
+
+## Test the Function
 
 ```bash
 curl -X POST 'https://lzxiipvflwsckygbovnz.supabase.co/functions/v1/send-notification' \

@@ -53,7 +53,14 @@ export async function subscribeToWebPush(): Promise<void> {
     // Get service worker registration
     const registration = await navigator.serviceWorker.ready;
 
-    // Subscribe to push notifications
+    // Check for existing subscription and unsubscribe if it exists
+    const existingSubscription = await registration.pushManager.getSubscription();
+    if (existingSubscription) {
+      console.log('Unsubscribing from old web push subscription...');
+      await existingSubscription.unsubscribe();
+    }
+
+    // Subscribe to push notifications with new VAPID key
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(
