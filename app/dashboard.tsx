@@ -10,6 +10,7 @@ import { createAndShareInvite } from '../lib/actions/invites';
 import { listMyFriends } from '../lib/api/friends';
 import { useMyProfile } from '../lib/useMyProfile';
 import { supabase } from '../lib/supabaseClient';
+import { sendMessage } from '../lib/api/messages';
 import { Platform } from 'react-native';
 import { getUserStats, getPeriodStats, formatDuration, UserStats, PeriodStats } from '../lib/api/stats';
 
@@ -155,9 +156,26 @@ export default function Dashboard() {
   };
 
   const handleShareToFriend = async (friendId: string, friendName: string, link: string) => {
-    await handleCopyLink(link);
-    window.alert(`Link copied! Now you can send it to ${friendName}`);
-    setShareModalVisible(false);
+    try {
+      if (!selectedSession || !profile) return;
+      
+      // Send them a message in the session chat with the invite link
+      await sendMessage(selectedSession.id, `Hey ${friendName}! Join my walk: ${link}`);
+      
+      // Show success message
+      if (Platform.OS === 'web') {
+        window.alert(`✅ Invite sent to ${friendName}!`);
+      }
+      
+      setShareModalVisible(false);
+    } catch (error) {
+      console.error('Failed to share to friend:', error);
+      // Fallback to copy link
+      await handleCopyLink(link);
+      if (Platform.OS === 'web') {
+        window.alert(`Couldn't send directly. Link copied! Send it to ${friendName} manually.`);
+      }
+    }
   };
 
   async function handleCreateGroupWalk() {
