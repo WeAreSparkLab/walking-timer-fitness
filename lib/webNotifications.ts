@@ -71,12 +71,16 @@ export async function subscribeToWebPush(): Promise<void> {
     // Save subscription to database
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({ web_push_subscription: subscription.toJSON() })
         .eq('id', user.id);
 
-      console.log('✅ Web push subscription saved');
+      if (error) {
+        console.error('Failed to save web push subscription:', error);
+      } else {
+        console.log('✅ Web push subscription saved');
+      }
     }
   } catch (error) {
     console.error('Failed to subscribe to web push:', error);
