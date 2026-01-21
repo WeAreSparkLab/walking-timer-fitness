@@ -54,7 +54,11 @@ export default function RootLayout() {
     if (Platform.OS === 'web') {
       const setupNotifications = async () => {
         try {
-          // Wait for user to interact with the app
+          // Wait for service worker to be fully ready
+          const registration = await navigator.serviceWorker.ready;
+          console.log('Service worker ready, setting up notifications...');
+          
+          // Wait a bit more for stability
           setTimeout(async () => {
             try {
               // Import dynamically to avoid issues
@@ -63,7 +67,7 @@ export default function RootLayout() {
             } catch (subError) {
               console.log('Could not setup web push:', subError);
             }
-          }, 5000); // Wait 5 seconds after app loads
+          }, 2000); // Wait 2 seconds after service worker is ready
         } catch (error) {
           console.log('Notification setup skipped:', error);
         }
