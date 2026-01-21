@@ -27,6 +27,48 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(fetch(event.request));
 });
 
+// Handle push notifications
+self.addEventListener('push', (event) => {
+  console.log('Push notification received:', event);
+  
+  let notificationData = {
+    title: 'New Notification',
+    body: 'You have a new notification',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    data: {}
+  };
+
+  // Try to parse the push data
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      notificationData = {
+        title: payload.title || notificationData.title,
+        body: payload.body || notificationData.body,
+        icon: payload.icon || notificationData.icon,
+        badge: payload.badge || notificationData.badge,
+        data: payload.data || notificationData.data,
+      };
+    } catch (error) {
+      console.error('Failed to parse push data:', error);
+    }
+  }
+
+  console.log('Showing notification:', notificationData);
+
+  event.waitUntil(
+    self.registration.showNotification(notificationData.title, {
+      body: notificationData.body,
+      icon: notificationData.icon,
+      badge: notificationData.badge,
+      data: notificationData.data,
+      tag: notificationData.data?.type || 'notification',
+      requireInteraction: false,
+    })
+  );
+});
+
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
   console.log('Notification clicked:', event.notification.data);

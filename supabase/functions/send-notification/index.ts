@@ -1,10 +1,12 @@
 // Supabase Edge Function for sending web push notifications
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import webpush from 'npm:web-push@3.6.7'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
@@ -34,6 +36,8 @@ serve(async (req) => {
 
     if (notifError) {
       console.error('Failed to create notification:', notifError)
+    } else {
+      console.log('✅ In-app notification created')
     }
 
     // 2. Get user's web push subscription
@@ -46,13 +50,11 @@ serve(async (req) => {
     // 3. Send web push notification if subscription exists
     if (profile?.web_push_subscription) {
       try {
-        // Use web-push library (you'll need to add this to import map)
-        const webpush = await import('https://esm.sh/web-push@3.6.3')
-        
         const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY')!
         const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY')!
-        const vapidSubject = Deno.env.get('VAPID_SUBJECT')!
+        const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:support@wearesparklab.com'
 
+        // Set VAPID details
         webpush.setVapidDetails(
           vapidSubject,
           vapidPublicKey,
@@ -67,11 +69,16 @@ serve(async (req) => {
           data,
         })
 
+        console.log('Sending web push to:', profile.web_push_subscription.endpoint?.substring(0, 50) + '...')
+        
         await webpush.sendNotification(profile.web_push_subscription, payload)
-        console.log('Web push sent successfully')
-      } catch (pushError) {
-        console.error('Web push failed:', pushError)
+        console.log('✅ Web push sent successfully')
+      } catch (pushError: any) {
+        console.error('❌ Web push failed:', pushError.message || pushError)
+        console.error('Push error details:', pushError.body)
       }
+    } else {
+      console.log('No web push subscription found for user')
     }
 
     // 4. Send Expo push notification if token exists
@@ -96,7 +103,7 @@ serve(async (req) => {
         if (!response.ok) {
           console.error('Expo push failed:', await response.text())
         } else {
-          console.log('Expo push sent successfully')
+          console.log('✅ Expo push sent successfully')
         }
       } catch (expoError) {
         console.error('Expo push failed:', expoError)
@@ -107,7 +114,7 @@ serve(async (req) => {
       JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Function error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
