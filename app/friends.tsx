@@ -221,7 +221,12 @@ export default function Friends() {
               </View>
             ) : (
               friends.map((friend) => (
-                <View key={friend.id} style={styles.userCard}>
+                <TouchableOpacity 
+                  key={friend.id} 
+                  style={styles.userCard}
+                  onPress={() => router.push(`/user/${friend.id}`)}
+                  activeOpacity={0.85}
+                >
                   <View style={styles.userAvatar}>
                     {friend.avatar_url ? (
                       <Image source={{ uri: friend.avatar_url }} style={styles.avatarImage} />
@@ -233,18 +238,21 @@ export default function Friends() {
                   </View>
                   <View style={styles.userInfo}>
                     <Text style={styles.userName}>{friend.username || 'User'}</Text>
-                    {friend.email && <Text style={styles.userEmail}>{friend.email}</Text>}
+                    <Text style={styles.userEmail}>Tap to view profile</Text>
                   </View>
                   <TouchableOpacity 
                     style={styles.userAction}
-                    onPress={() => router.push({ 
-                      pathname: '/chat/[friendId]', 
-                      params: { friendId: friend.id, friendName: friend.username || 'User' } 
-                    })}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      router.push({ 
+                        pathname: '/chat/[friendId]', 
+                        params: { friendId: friend.id, friendName: friend.username || 'User' } 
+                      });
+                    }}
                   >
                     <Text style={styles.chatIcon}>💬</Text>
                   </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               ))
             )}
           </View>
@@ -283,7 +291,12 @@ export default function Friends() {
                 .map((user) => {
                   const isPending = sentRequests.has(user.id);
                   return (
-                    <View key={user.id} style={styles.userCard}>
+                    <TouchableOpacity 
+                      key={user.id} 
+                      style={styles.userCard}
+                      onPress={() => router.push(`/user/${user.id}`)}
+                      activeOpacity={0.85}
+                    >
                       <View style={styles.userAvatar}>
                         {user.avatar_url ? (
                           <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
@@ -295,17 +308,20 @@ export default function Friends() {
                       </View>
                       <View style={styles.userInfo}>
                         <Text style={styles.userName}>{user.username || 'User'}</Text>
-                        {user.email && <Text style={styles.userEmail}>{user.email}</Text>}
                         {isPending && <Text style={styles.pendingText}>Request Pending</Text>}
+                        {!isPending && <Text style={styles.userEmail}>Tap to view profile</Text>}
                       </View>
                       <TouchableOpacity 
-                        onPress={() => !isPending && handleAddFriend(user.id)}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          if (!isPending) handleAddFriend(user.id);
+                        }}
                         style={[styles.addBtn, isPending && styles.addBtnDisabled]}
                         disabled={isPending}
                       >
                         <Text style={styles.addIcon}>{isPending ? '⏳' : '+'}</Text>
                       </TouchableOpacity>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })
             )}
@@ -321,7 +337,12 @@ export default function Friends() {
               </View>
             ) : (
               requests.map((req) => (
-                <View key={req.id} style={styles.requestCard}>
+                <TouchableOpacity 
+                  key={req.id} 
+                  style={styles.requestCard}
+                  onPress={() => router.push(`/user/${req.requester_id}`)}
+                  activeOpacity={0.85}
+                >
                   <View style={styles.userAvatar}>
                     {req.requester?.avatar_url ? (
                       <Image source={{ uri: req.requester.avatar_url }} style={styles.avatarImage} />
@@ -339,19 +360,25 @@ export default function Friends() {
                   </View>
                   <View style={styles.requestActions}>
                     <TouchableOpacity 
-                      onPress={() => handleAcceptRequest(req.id)}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleAcceptRequest(req.id);
+                      }}
                       style={styles.acceptBtn}
                     >
                       <Text style={styles.checkIcon}>✓</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                      onPress={() => handleRejectRequest(req.id)}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleRejectRequest(req.id);
+                      }}
                       style={styles.rejectBtn}
                     >
                       <Text style={[styles.checkIcon, { color: colors.danger }]}>✕</Text>
                     </TouchableOpacity>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))
             )}
           </View>

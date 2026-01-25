@@ -35,6 +35,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 /**
  * Subscribe to web push notifications
+ * Will request permission if not already granted
  */
 export async function subscribeToWebPush(): Promise<void> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -53,20 +54,27 @@ export async function subscribeToWebPush(): Promise<void> {
     // Get service worker registration
     const registration = await navigator.serviceWorker.ready;
 
-    // Check for existing subscription and unsubscribe if it exists
+    // VAPID key - must match the one in Supabase Edge Function secrets
+    const vapidPublicKey = 'BPREOpNMvhTuXhI_3s9JWM2cEwNSz2we9oPMYiq-5I14BCIssmpEG1BHNPsM2CW5sJ3CWv3tV-0VniAi8EOKmQU';
+
+    // Check for existing subscription
     const existingSubscription = await registration.pushManager.getSubscription();
     if (existingSubscription) {
-      console.log('Unsubscribing from old web push subscription...');
+      // Force unsubscribe and create fresh subscription with current VAPID key
+      console.log('🔄 Unsubscribing old push subscription to refresh with current VAPID key...');
       await existingSubscription.unsubscribe();
+      console.log('✅ Old subscription removed');
     }
 
-    // Subscribe to push notifications with new VAPID key
+    // Subscribe to push notifications with VAPID key
+    console.log('🔑 Creating new push subscription with VAPID key:', vapidPublicKey.substring(0, 20) + '...');
+    
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(
-        'BKGexLVJAd9Z0oQQuOBXyFL6ygaNrDpcnRi0Ij80CKpgJHZIXsy07Wo5zhyr8h6RKhNU-5yn4MEr1vFpfgCIpAc'
-      )
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
     });
+    
+    console.log('✅ Push subscription created:', subscription.endpoint.substring(0, 50));
 
     // Save subscription to database
     const { data: { user } } = await supabase.auth.getUser();
@@ -84,6 +92,61 @@ export async function subscribeToWebPush(): Promise<void> {
     }
   } catch (error) {
     console.error('Failed to subscribe to web push:', error);
+  }
+}
+
+/**
+ * Ensure user has web push enabled (requests permission if needed)
+ * Call this before sending notifications on web
+ */
+export async function ensureWebPushEnabled(): Promise<boolean> {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    console.log('❌ Notifications not supported in this browser');
+    return false;
+  }
+
+  console.log('🔔 Current notification permission:', Notification.permission);
+
+  if (Notification.permission === 'granted') {
+    console.log('✅ Permission already granted');
+    // Check if we have a subscription saved
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.log('❌ No user logged in');
+      return false;
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('web_push_subscription')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.web_push_subscription) {
+      console.log('⚠️ No subscription found, subscribing now...');
+      // Have permission but no subscription - subscribe now
+      await subscribeToWebPush();
+    } else {
+      console.log('✅ Web push subscription exists');
+    }
+    return true;
+  }
+
+  if (Notification.permission === 'denied') {
+    console.log('❌ Notification permission DENIED. User must enable in browser settings.');
+    return false;
+  }
+
+  // Permission is 'default' - request it
+  console.log('🔔 Requesting notification permission...');
+  try {
+    await subscribeToWebPush();
+    const finalPermission = Notification.permission;
+    console.log('🔔 Final permission:', finalPermission);
+    return finalPermission === 'granted';
+  } catch (error) {
+    console.error('❌ Failed to enable web push:', error);
+    return false;
   }
 }
 

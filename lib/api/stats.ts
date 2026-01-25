@@ -240,3 +240,75 @@ export function formatDuration(seconds: number): string {
   }
   return `${minutes}m`;
 }
+
+/**
+ * Get another user's statistics (public profile data)
+ */
+export async function getUserStatsById(userId: string): Promise<UserStats | null> {
+  const { data, error } = await supabase
+    .from('user_stats')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching user stats:', error);
+    return null;
+  }
+  return data || null;
+}
+
+/**
+ * Get a user's leaderboard position
+ */
+export async function getUserLeaderboardPosition(
+  userId: string,
+  period: 'week' | 'month' | 'all' = 'all'
+): Promise<{ rank: number; totalUsers: number } | null> {
+  if (period === 'all') {
+    // Use user_stats table for all-time
+    const { data, error } = await supabase
+      .from('user_stats')
+      .select('user_id, total_points')
+      .order('total_points', { ascending: false });
+
+    if (error) return null;
+
+    const rank = (data || []).findIndex(s => s.user_id === userId) + 1;
+    return rank > 0 ? { rank, totalUsers: data?.length || 0 } : null;
+  }
+
+  // For week/month, aggregate from activities
+  let dateFilter = '';
+  const now = new Date();
+
+  if (period === 'week') {
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    dateFilter = weekAgo.toISOString();
+  } else if (period === 'month') {
+    const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    dateFilter = monthAgo.toISOString();
+  }
+
+  let query = supabase.from('user_activities').select('user_id, points');
+  if (dateFilter) {
+    query = query.gte('completed_at', dateFilter);
+  }
+
+  const { data, error } = await query;
+  if (error) return null;
+
+  // Aggregate by user
+  const userScores = new Map<string, number>();
+  (data || []).forEach(activity => {
+    const current = userScores.get(activity.user_id) || 0;
+    userScores.set(activity.user_id, current + activity.points);
+  });
+
+  // Sort and find position
+  const sorted = Array.from(userScores.entries())
+    .sort((a, b) => b[1] - a[1]);
+
+  const rank = sorted.findIndex(([id]) => id === userId) + 1;
+  return rank > 0 ? { rank, totalUsers: sorted.length } : null;
+}

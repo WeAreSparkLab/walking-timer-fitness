@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad, radius, paceColors } from '../lib/theme';
 import 'react-native-get-random-values';
 import { v4 as uuid } from 'uuid';
-import { savePlan, getPlanById, Pace } from '../lib/storage';
+import { savePlan, getPlanById, removePlan, Pace } from '../lib/storage';
 
 type IntervalItem = { pace: Pace; minutes: number; seconds: number };
 
@@ -48,13 +48,44 @@ export default function CreateWalk() {
         minutes: Math.max(0, iv.minutes | 0),
         seconds: Math.max(0, Math.min(59, iv.seconds | 0)),
       }))
-      .filter(iv => iv.minutes * 60 + iv.seconds > 0);
+      .filter(iv => iv.minutes > 0 || iv.seconds > 0);
 
-    if (!walkName.trim()) return Alert.alert('Name needed', 'Give your walk a name.');
-    if (!cleaned.length) return Alert.alert('Intervals', 'Add at least one non-zero interval.');
+    if (!walkName.trim()) {
+      Alert.alert('Name Required', 'Please enter a name for this walk');
+      return;
+    }
+    if (cleaned.length === 0) {
+      Alert.alert('No Intervals', 'Please add at least one interval with time > 0');
+      return;
+    }
 
-    await savePlan({ id: walkId || uuid(), name: walkName.trim(), intervals: cleaned, createdAt: Date.now() });
-    router.replace('/dashboard');
+    await savePlan({
+      id: walkId || uuid(),
+      name: walkName,
+      intervals: cleaned,
+      createdAt: Date.now(),
+    });
+    router.push('/dashboard');
+  };
+
+  const handleDeleteWalk = async () => {
+    if (!editId) return;
+    
+    Alert.alert(
+      'Delete Walk',
+      'Are you sure you want to delete this walk?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive', 
+          onPress: async () => {
+            await removePlan(editId);
+            router.replace('/dashboard');
+          }
+        },
+      ]
+    );
   };
 
   return (
@@ -65,7 +96,12 @@ export default function CreateWalk() {
           <Text style={styles.iconText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{editId ? 'Edit Walk' : 'Create Walk'}</Text>
-        <View style={{ width: 36 }} />
+        {editId && (
+          <TouchableOpacity onPress={handleDeleteWalk} style={styles.iconBtn}>
+            <Ionicons name="trash-outline" size={24} color={colors.danger} />
+          </TouchableOpacity>
+        )}
+        {!editId && <View style={{ width: 36 }} />}
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: pad.lg }}>

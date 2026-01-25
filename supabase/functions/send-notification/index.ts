@@ -17,6 +17,9 @@ serve(async (req) => {
 
   try {
     const { userId, title, body, data } = await req.json()
+    
+    console.log('🔔 Edge Function called:', { userId, title, body })
+    console.log('🆔 Querying profiles for user ID:', userId)
 
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -41,18 +44,39 @@ serve(async (req) => {
     }
 
     // 2. Get user's web push subscription
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('web_push_subscription, push_token')
+      .select('*')
       .eq('id', userId)
       .single()
 
+    console.log('👤 RAW PROFILE:', JSON.stringify(profile))
+    console.log('👤 PROFILE ERROR:', profileError)
+    console.log('👤 PROFILE KEYS:', profile ? Object.keys(profile) : 'no profile')
+    console.log('👤 WEB_PUSH_SUBSCRIPTION:', profile?.web_push_subscription)
+    console.log('👤 HAS WEB PUSH:', !!profile?.web_push_subscription)
+
     // 3. Send web push notification if subscription exists
+    let webPushSuccess = false;
     if (profile?.web_push_subscription) {
       try {
-        const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY')!
-        const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY')!
+        const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY')
+        const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY')
         const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:support@wearesparklab.com'
+
+        console.log('🔐 VAPID keys configured:', {
+          hasPublicKey: !!vapidPublicKey,
+          hasPrivateKey: !!vapidPrivateKey,
+          subject: vapidSubject,
+        })
+
+        if (!vapidPublicKey || !vapidPrivateKey) {
+          console.error('❌ VAPID keys not configured!')
+          return new Response(
+            JSON.stringify({ success: false, error: 'VAPID keys not configured' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
 
         // Set VAPID details
         webpush.setVapidDetails(
@@ -69,16 +93,21 @@ serve(async (req) => {
           data,
         })
 
-        console.log('Sending web push to:', profile.web_push_subscription.endpoint?.substring(0, 50) + '...')
+        console.log('📤 Sending web push...')
+        console.log('📍 Endpoint:', profile.web_push_subscription.endpoint?.substring(0, 80))
+        console.log('📦 Payload:', payload.substring(0, 200))
         
-        await webpush.sendNotification(profile.web_push_subscription, payload)
-        console.log('✅ Web push sent successfully')
+        const result = await webpush.sendNotification(profile.web_push_subscription, payload)
+        console.log('✅ Web push sent successfully!', result)
+        webPushSuccess = true;
       } catch (pushError: any) {
         console.error('❌ Web push failed:', pushError.message || pushError)
-        console.error('Push error details:', pushError.body)
+        console.error('❌ Error stack:', pushError.stack)
+        console.error('❌ Error body:', pushError.body)
+        console.error('❌ Status code:', pushError.statusCode)
       }
     } else {
-      console.log('No web push subscription found for user')
+      console.log('⚠️ No web push subscription found for user')
     }
 
     // 4. Send Expo push notification if token exists
@@ -111,7 +140,11 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ 
+        success: true, 
+        webPushSent: true,
+        inAppCreated: !notifError,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error: any) {

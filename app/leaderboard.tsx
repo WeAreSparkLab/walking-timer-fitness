@@ -99,13 +99,15 @@ export default function Leaderboard() {
             const isCurrentUser = entry.user_id === currentUserId;
             
             return (
-              <View 
+              <TouchableOpacity 
                 key={entry.user_id} 
                 style={[
                   styles.leaderboardCard,
                   isCurrentUser && styles.currentUserCard,
                   shadow.card
                 ]}
+                onPress={() => router.push(`/user/${entry.user_id}`)}
+                activeOpacity={0.85}
               >
                 {/* Rank */}
                 <View style={styles.rankContainer}>
@@ -132,7 +134,7 @@ export default function Leaderboard() {
                   </Text>
                   <Text style={styles.pointsLabel}>pts</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             );
           })
         )}

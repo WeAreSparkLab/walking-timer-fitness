@@ -1,3 +1,18 @@
+  // Ensure web push subscription is created after permission is granted
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const onPermissionChange = async () => {
+        if (Notification.permission === 'granted') {
+          const { subscribeToWebPush } = await import('../lib/webNotifications');
+          await subscribeToWebPush();
+        }
+      };
+      document.addEventListener('visibilitychange', onPermissionChange);
+      return () => {
+        document.removeEventListener('visibilitychange', onPermissionChange);
+      };
+    }
+  }, []);
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../lib/theme';
@@ -49,25 +64,42 @@ export default function RootLayout() {
     }
   }, []);
 
+  // Listen for navigation messages from service worker
+  useEffect(() => {
+    if (Platform.OS === 'web' && 'serviceWorker' in navigator) {
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'NAVIGATE' && event.data?.url) {
+          console.log('Received navigation message from SW:', event.data.url);
+          const url = new URL(event.data.url);
+          router.push(url.pathname + url.search);
+        }
+      };
+      
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleMessage);
+      };
+    }
+  }, [router]);
+
   // Request web push notification permission after user interaction
   useEffect(() => {
     if (Platform.OS === 'web') {
       const setupNotifications = async () => {
         try {
-          // Wait for service worker to be fully ready
+          // Wait for service worker to be ready
           const registration = await navigator.serviceWorker.ready;
-          console.log('Service worker ready, setting up notifications...');
+          console.log('Service worker ready');
           
-          // Wait a bit more for stability
-          setTimeout(async () => {
-            try {
-              // Import dynamically to avoid issues
-              const { subscribeToWebPush } = await import('../lib/webNotifications');
-              await subscribeToWebPush();
-            } catch (subError) {
-              console.log('Could not setup web push:', subError);
-            }
-          }, 2000); // Wait 2 seconds after service worker is ready
+          // Check if permission already granted
+          if (Notification.permission === 'granted') {
+            // Already have permission, can subscribe immediately
+            const { subscribeToWebPush } = await import('../lib/webNotifications');
+            await subscribeToWebPush();
+          } else if (Notification.permission === 'default') {
+            // Wait for user interaction before prompting
+            console.log('Notification permission not yet requested - will prompt on first notification send');
+          }
         } catch (error) {
           console.log('Notification setup skipped:', error);
         }
