@@ -60,17 +60,6 @@ export async function createInvite(sessionId: string) {
   return data.token as string;
 }
 
-export async function joinSession(sessionId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in');
-
-  const { error } = await supabase
-    .from('session_participants')
-    .insert({ session_id: sessionId, user_id: user.id });
-  if (error && !String(error.message).includes('duplicate')) throw error;
-  return true;
-}
-
 export async function startSession(sessionId: string) {
   const { data, error } = await supabase
     .from('sessions')
@@ -183,6 +172,16 @@ export async function deleteSession(sessionId: string) {
   if (error) throw error;
 }
 
+export async function removeParticipant(sessionId: string, userId: string) {
+  const { error } = await supabase
+    .from('session_participants')
+    .delete()
+    .eq('session_id', sessionId)
+    .eq('user_id', userId);
+  
+  if (error) throw error;
+}
+
 export async function updateSession(sessionId: string, name: string, plan: IntervalDTO[]) {
   const { error } = await supabase
     .from('sessions')
@@ -227,18 +226,88 @@ export function subscribeToSessionControl(sessionId: string, onChange: (data: { 
     }, (payload) => {
       console.log('Session control change received:', payload);
       const session = payload.new as Session;
+      // Only propagate changes to the fields we care about
       onChange({
         isRunning: session.status === 'active',
-        currentInterval: session.current_interval,
-        timeRemaining: session.time_remaining
+        currentInterval: session.current_interval || 0,
+        timeRemaining: session.time_remaining || 0
       });
     })
     .subscribe((status) => {
       console.log('Subscription status:', status);
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Successfully subscribed to session control');
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error('❌ Channel error - check Realtime is enabled for sessions table');
+      }
     });
 
   return () => { 
     console.log('Unsubscribing from session control');
     supabase.removeChannel(channel); 
   };
+}
+
+/** Join a session by session ID (if not already a participant) */
+export async function joinSession(sessionId: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+
+  // Check if already a participant
+  const { data: existing } = await supabase
+    .from('session_participants')
+    .select('user_id')
+    .eq('session_id', sessionId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (existing) {
+    console.log('Already a participant in this session');
+    return false; // Already joined
+  }
+
+  // Join the session
+  const { error } = await supabase
+    .from('session_participants')
+    .insert({ session_id: sessionId, user_id: user.id });
+
+  if (error && !String(error.message).includes('duplicate')) {
+    throw error;
+  }
+
+  return true; // Newly joined
+}
+
+/** Check if current user is a participant in a session */
+export async function isParticipant(sessionId: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data } = await supabase
+    .from('session_participants')
+    .select('user_id')
+    .eq('session_id', sessionId)
+    .eq('user_id', user.id)
+    .single();
+
+  return !!data;
+}
+
+/** Leave a session (for non-host participants) */
+export async function leaveSession(sessionId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+
+  // Check if user is the host
+  const { data: session } = await supabase
+    .from('sessions')
+    .select('host_id')
+    .eq('id', sessionId)
+    .single();
+
+  if (session?.host_id === user.id) {
+    throw new Error('Host cannot leave - delete the session instead');
+  }
+
+  await removeParticipant(sessionId, user.id);
 }

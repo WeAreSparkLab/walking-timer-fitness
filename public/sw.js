@@ -75,22 +75,32 @@ self.addEventListener('notificationclick', (event) => {
   
   event.notification.close();
   
-  // Get the URL from notification data
-  const urlToOpen = event.notification.data?.url || '/';
+  const data = event.notification.data || {};
+  let urlToOpen = 'https://walks.wearesparklab.com/dashboard';
+  
+  // Build URL based on notification type
+  if (data.type === 'walk_invite' && data.session_id) {
+    urlToOpen = `https://walks.wearesparklab.com/walk-timer?sessionId=${data.session_id}`;
+  } else if (data.type === 'session_invite' && data.link) {
+    urlToOpen = data.link;
+  }
+  
+  console.log('Opening URL:', urlToOpen);
   
   // Open or focus the app window
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       // Check if there's already a window open
       for (const client of clientList) {
-        if (client.url === urlToOpen && 'focus' in client) {
-          return client.focus();
+        if (client.url.includes('walks.wearesparklab.com') && 'focus' in client) {
+          // Just focus and navigate via postMessage instead
+          client.focus();
+          client.postMessage({ type: 'NAVIGATE', url: urlToOpen });
+          return;
         }
       }
       // Open new window if none exists
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
+      return clients.openWindow(urlToOpen);
     })
   );
 });

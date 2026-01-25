@@ -11,6 +11,7 @@ import { listMyFriends } from '../lib/api/friends';
 import { useMyProfile } from '../lib/useMyProfile';
 import { supabase } from '../lib/supabaseClient';
 import { sendNotificationToUser } from '../lib/api/notifications';
+import { deleteSession, leaveSession } from '../lib/api/sessions';
 import { Platform } from 'react-native';
 import { getUserStats, getPeriodStats, formatDuration, UserStats, PeriodStats } from '../lib/api/stats';
 
@@ -28,10 +29,26 @@ type GroupWalk = {
   }>;
 };
 
+type PendingInvite = {
+  id: string;
+  title: string;
+  message: string;
+  data: {
+    type: string;
+    session_id?: string;
+    session_name?: string;
+    host_name?: string;
+    link?: string;
+  };
+  created_at: string;
+  read: boolean;
+};
+
 export default function Dashboard() {
   const router = useRouter();
   const [plans, setPlans] = useState<WalkPlan[]>([]);
   const [groupWalks, setGroupWalks] = useState<GroupWalk[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [stats, setStats] = useState<UserStats | null>(null);
@@ -80,6 +97,91 @@ export default function Dashboard() {
     await loadGroupWalks();
     await loadStats();
     await loadFriends();
+    await loadPendingInvites();
+  };
+
+  const loadPendingInvites = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Load unread walk_invite notifications
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('read', false)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Failed to load pending invites:', error);
+        return;
+      }
+
+      // Filter to only walk_invite type
+      const invites = (data || []).filter(n => n.data?.type === 'walk_invite');
+      console.log('Pending walk invites:', invites.length);
+      setPendingInvites(invites);
+    } catch (error) {
+      console.error('Error loading pending invites:', error);
+    }
+  };
+
+  const handleAcceptInvite = async (invite: PendingInvite) => {
+    try {
+      const sessionId = invite.data?.session_id;
+      if (!sessionId) {
+        console.error('No session ID in invite');
+        return;
+      }
+
+      // Import and call joinSession
+      const { joinSession } = await import('../lib/api/sessions');
+      const joined = await joinSession(sessionId);
+      
+      if (joined) {
+        // Mark notification as read
+        await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('id', invite.id);
+
+        // Navigate to the walk timer
+        router.push(`/walk-timer?sessionId=${sessionId}`);
+      } else {
+        if (Platform.OS === 'web') {
+          window.alert('Already joined this walk!');
+        }
+        // Still mark as read
+        await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('id', invite.id);
+        
+        // Remove from local list
+        setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
+      }
+    } catch (error) {
+      console.error('Failed to accept invite:', error);
+      if (Platform.OS === 'web') {
+        window.alert('Failed to join walk. It may have been cancelled.');
+      }
+    }
+  };
+
+  const handleDismissInvite = async (invite: PendingInvite) => {
+    try {
+      // Mark notification as read
+      await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', invite.id);
+      
+      // Remove from local list
+      setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
+    } catch (error) {
+      console.error('Failed to dismiss invite:', error);
+    }
   };
 
   const loadFriends = async () => {
@@ -156,11 +258,23 @@ export default function Dashboard() {
   };
 
   const handleShareToFriend = async (friendId: string, friendName: string, link: string) => {
+    console.log('📤 Dashboard: Sending notification to friend:', friendName);
+    console.log('📤 Selected session:', selectedSession);
+    
     try {
-      if (!selectedSession) return;
+      if (!selectedSession) {
+        console.error('❌ No session selected!');
+        return;
+      }
       
       const walkName = selectedSession.name || 'Group Walk';
       const senderName = username || 'Someone';
+      
+      console.log('📨 Calling sendNotificationToUser from dashboard...', {
+        to: friendId,
+        from: senderName,
+        walk: walkName
+      });
       
       // Send notification via Edge Function (handles in-app, web push, and mobile push)
       const notificationSent = await sendNotificationToUser(
@@ -175,6 +289,21 @@ export default function Dashboard() {
           link: link,
         }
       );
+      
+      console.log('📬 Notification result:', notificationSent);
+      
+      // Check if friend has web push enabled
+      console.log('🔍 Checking friend web push status...');
+      const { data: friendProfile } = await supabase
+        .from('profiles')
+        .select('web_push_subscription')
+        .eq('id', friendId)
+        .single();
+      
+      console.log('👤 Friend web push status:', {
+        hasSubscription: !!friendProfile?.web_push_subscription,
+        endpoint: friendProfile?.web_push_subscription?.endpoint?.substring(0, 50),
+      });
       
       // Copy link to clipboard as backup
       if (Platform.OS === 'web') {
@@ -455,6 +584,38 @@ export default function Dashboard() {
           <Text style={styles.secondaryCtaText}>Find Friends</Text>
         </TouchableOpacity>
 
+        {/* Pending Walk Invites */}
+        {pendingInvites.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>🔔 Walk Invitations</Text>
+            {pendingInvites.map(invite => (
+              <View key={invite.id} style={styles.inviteCard}>
+                <View style={styles.inviteContent}>
+                  <Text style={styles.inviteTitle}>{invite.data?.session_name || 'Group Walk'}</Text>
+                  <Text style={styles.inviteMessage}>{invite.message}</Text>
+                  <Text style={styles.inviteTime}>
+                    {new Date(invite.created_at).toLocaleDateString()} at {new Date(invite.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
+                <View style={styles.inviteActions}>
+                  <TouchableOpacity 
+                    style={styles.acceptBtn}
+                    onPress={() => handleAcceptInvite(invite)}
+                  >
+                    <Text style={styles.acceptBtnText}>Join</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.dismissBtn}
+                    onPress={() => handleDismissInvite(invite)}
+                  >
+                    <Text style={styles.dismissBtnText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+
         {/* Group Walks */}
         {groupWalks.length > 0 && (
           <>
@@ -534,6 +695,88 @@ export default function Dashboard() {
                     >
                       <Text style={styles.inviteBtnTextIntegrated}>📤 Invite Friends</Text>
                     </TouchableOpacity>
+                    {session.host_id === currentUserId && (
+                      <TouchableOpacity
+                        style={styles.deleteBtn}
+                        onPress={async () => {
+                          if (Platform.OS === 'web') {
+                            if (window.confirm(`Delete "${session.name || 'Group Walk'}"?`)) {
+                              try {
+                                await deleteSession(session.id);
+                                setGroupWalks(prev => prev.filter(s => s.id !== session.id));
+                              } catch (error) {
+                                console.error('Failed to delete session:', error);
+                                window.alert('Failed to delete walk');
+                              }
+                            }
+                          } else {
+                            Alert.alert(
+                              'Delete Walk',
+                              `Delete "${session.name || 'Group Walk'}"?`,
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Delete',
+                                  style: 'destructive',
+                                  onPress: async () => {
+                                    try {
+                                      await deleteSession(session.id);
+                                      setGroupWalks(prev => prev.filter(s => s.id !== session.id));
+                                    } catch (error) {
+                                      console.error('Failed to delete session:', error);
+                                      Alert.alert('Error', 'Failed to delete walk');
+                                    }
+                                  }
+                                }
+                              ]
+                            );
+                          }
+                        }}
+                      >
+                        <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                      </TouchableOpacity>
+                    )}
+                    {session.host_id !== currentUserId && (
+                      <TouchableOpacity
+                        style={styles.leaveBtn}
+                        onPress={async () => {
+                          if (Platform.OS === 'web') {
+                            if (window.confirm(`Leave "${session.name || 'Group Walk'}"?`)) {
+                              try {
+                                await leaveSession(session.id);
+                                setGroupWalks(prev => prev.filter(s => s.id !== session.id));
+                              } catch (error) {
+                                console.error('Failed to leave session:', error);
+                                window.alert('Failed to leave walk');
+                              }
+                            }
+                          } else {
+                            Alert.alert(
+                              'Leave Walk',
+                              `Leave "${session.name || 'Group Walk'}"?`,
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Leave',
+                                  style: 'destructive',
+                                  onPress: async () => {
+                                    try {
+                                      await leaveSession(session.id);
+                                      setGroupWalks(prev => prev.filter(s => s.id !== session.id));
+                                    } catch (error) {
+                                      console.error('Failed to leave session:', error);
+                                      Alert.alert('Error', 'Failed to leave walk');
+                                    }
+                                  }
+                                }
+                              ]
+                            );
+                          }
+                        }}
+                      >
+                        <Ionicons name="exit-outline" size={18} color={colors.sub} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               </View>
@@ -849,6 +1092,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  deleteBtn: {
+    backgroundColor: colors.card,
+    paddingVertical: 12,
+    paddingHorizontal: pad.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: colors.line,
+  },
+  leaveBtn: {
+    backgroundColor: colors.card,
+    paddingVertical: 12,
+    paddingHorizontal: pad.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: colors.line,
+  },
   inviteBtnIntegrated: { 
     flex: 1,
     backgroundColor: colors.accent + '10', 
@@ -876,6 +1137,65 @@ const styles = StyleSheet.create({
   participantAvatarText: { color: colors.text, fontSize: 12, fontWeight: '700' },
   hostBadge: { position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   hostBadgeText: { fontSize: 10 },
+
+  // Invite Card Styles
+  inviteCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.accent + '40',
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: pad.md,
+  },
+  inviteContent: {
+    flex: 1,
+  },
+  inviteTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  inviteMessage: {
+    color: colors.sub,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  inviteTime: {
+    color: colors.sub,
+    fontSize: 11,
+    marginTop: 4,
+    opacity: 0.7,
+  },
+  inviteActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  acceptBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: radius.md,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  acceptBtnText: {
+    color: colors.bg,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  dismissBtn: {
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  dismissBtnText: {
+    color: colors.sub,
+    fontSize: 14,
+  },
 
   // Share Modal Styles
   shareModalOverlay: {

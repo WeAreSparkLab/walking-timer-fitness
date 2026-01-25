@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { sendNotificationToUser } from './notifications';
 
 export type DirectMessage = {
   id: string;
@@ -62,6 +63,16 @@ export async function sendDirectMessage(recipientId: string, text: string) {
     .select('id, username, avatar_url')
     .eq('id', user.id)
     .single();
+
+  // Send push notification to recipient
+  const senderName = profile?.username || 'Someone';
+  const previewText = text.length > 50 ? text.substring(0, 50) + '...' : text;
+  await sendNotificationToUser(
+    recipientId,
+    `💬 ${senderName}`,
+    previewText,
+    { type: 'direct_message', sender_id: user.id, sender_name: senderName }
+  );
 
   return {
     ...data,

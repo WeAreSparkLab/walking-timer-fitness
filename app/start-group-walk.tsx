@@ -5,9 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad, radius } from '../lib/theme';
 import { getPlans } from '../lib/storage';
-import { createSession, createInvite, startSession, getSession, updateSession } from '../lib/api/sessions';
+import { createSession, createInvite, startSession, getSession, updateSession, deleteSession } from '../lib/api/sessions';
 import { listMyFriends } from '../lib/api/friends';
 import { supabase } from '../lib/supabaseClient';
+import { sendNotificationToUser } from '../lib/api/notifications';
+import { ensureWebPushEnabled } from '../lib/webNotifications';
 
 export default function StartGroupWalk() {
   const router = useRouter();
@@ -184,11 +186,82 @@ export default function StartGroupWalk() {
   };
 
   const handleShareToFriend = async (friendId: string, friendName: string) => {
-    // For now, just copy the link when clicking a friend
-    // In the future, this could send a direct notification
-    await handleCopyLink();
-    if (Platform.OS === 'web') {
-      window.alert(`Link copied! Share it with ${friendName}`);
+    if (!inviteLink || !sessionName) {
+      console.error('❌ Missing invite link or session name');
+      return;
+    }
+    
+    console.log('📤 Sending notification to friend:', friendName);
+    
+    try {
+      // Ensure web push is enabled (will prompt if needed)
+      if (Platform.OS === 'web') {
+        console.log('🌐 Running on web, checking push notification setup...');
+        try {
+          const enabled = await ensureWebPushEnabled();
+          console.log('🔔 Push enabled:', enabled);
+          
+          if (!enabled) {
+            console.error('❌ Could not enable notifications');
+            window.alert('Notifications are blocked or denied.\n\nTo enable:\n1. Click the lock icon in the address bar\n2. Change Notifications to "Allow"\n3. Refresh the page and try again');
+            return;
+          }
+        } catch (pushError) {
+          console.error('❌ Push setup error:', pushError);
+          // Continue anyway - notification might still work
+        }
+      }
+      
+      // Get current user's name
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('❌ No user logged in');
+        return;
+      }
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
+      
+      const senderName = profile?.username || 'Someone';
+      
+      console.log('📨 Calling sendNotificationToUser...', {
+        to: friendId,
+        from: senderName,
+        session: sessionName
+      });
+      
+      // Send notification via Edge Function (supports both web and mobile push)
+      const success = await sendNotificationToUser(
+        friendId,
+        '🚶 Walk Invitation',
+        `${senderName} invited you to join "${sessionName}"`,
+        {
+          type: 'session_invite',
+          inviteLink: inviteLink,
+          sessionName: sessionName,
+          sessionId: sessionId
+        }
+      );
+      
+      console.log('📬 Notification sent result:', success);
+      
+      if (Platform.OS === 'web') {
+        window.alert(`Notification sent to ${friendName}!`);
+      } else {
+        Alert.alert('Sent!', `Notification sent to ${friendName}`);
+      }
+      
+      setShareModalVisible(false);
+    } catch (error) {
+      console.error('❌ Failed to send notification:', error);
+      // Fallback to copying link
+      await handleCopyLink();
+      if (Platform.OS === 'web') {
+        window.alert(`Could not send notification. Link copied! Share it with ${friendName}`);
+      }
     }
   };
 
@@ -209,6 +282,42 @@ export default function StartGroupWalk() {
     }
   };
 
+  const handleDeleteSession = async () => {
+    if (!sessionId) return;
+    
+    const confirm = Platform.OS === 'web' 
+      ? window.confirm('Are you sure you want to delete this group walk?')
+      : await new Promise((resolve) => {
+          Alert.alert(
+            'Delete Walk',
+            'Are you sure you want to delete this group walk?',
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Delete', style: 'destructive', onPress: () => resolve(true) }
+            ]
+          );
+        });
+    
+    if (!confirm) return;
+    
+    try {
+      await deleteSession(sessionId);
+      if (Platform.OS === 'web') {
+        window.alert('Group walk deleted');
+      } else {
+        Alert.alert('Deleted', 'Group walk has been deleted');
+      }
+      router.replace('/dashboard');
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+      if (Platform.OS === 'web') {
+        window.alert('Failed to delete walk');
+      } else {
+        Alert.alert('Error', 'Failed to delete walk');
+      }
+    }
+  };
+
   if (inviteLink && sessionId && !editId) {
     return (
       <View style={styles.container}>
@@ -219,7 +328,9 @@ export default function StartGroupWalk() {
             <Text style={styles.iconText}>✕</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Ready to Walk!</Text>
-          <View style={{ width: 36 }} />
+          <TouchableOpacity onPress={handleDeleteSession} style={styles.iconBtn}>
+            <Ionicons name="trash-outline" size={24} color={colors.danger} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.content}>
@@ -332,7 +443,7 @@ export default function StartGroupWalk() {
                 </View>
 
                 {/* Friends List */}
-                {friends.length > 0 && (
+                {friends && friends.length > 0 && (
                   <>
                     <Text style={styles.shareSection}>Your Friends</Text>
                     {friends.map((friend) => (

@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { notifyFriendRequest, notifyFriendRequestAccepted } from '../notifications';
+import { sendNotificationToUser } from './notifications';
 
 export type Friendship = {
   id: string;
@@ -28,9 +28,14 @@ export async function sendFriendRequest(addresseeId: string) {
     .eq('id', user.id)
     .single();
 
-  // Send push notification to addressee
+  // Send push notification to addressee via Edge Function
   if (profile?.username) {
-    await notifyFriendRequest(addresseeId, profile.username);
+    await sendNotificationToUser(
+      addresseeId,
+      '👋 Friend Request',
+      `${profile.username} wants to be your friend!`,
+      { type: 'friend_request', requester_id: user.id, requester_name: profile.username }
+    );
   }
 
   return data as Friendship;
@@ -48,7 +53,7 @@ export async function respondToFriendRequest(friendshipId: string, status: 'acce
     .single();
   if (error) throw error;
 
-  // If accepted, notify the requester
+  // If accepted, notify the requester via Edge Function
   if (status === 'accepted' && data) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -57,7 +62,12 @@ export async function respondToFriendRequest(friendshipId: string, status: 'acce
       .single();
 
     if (profile?.username) {
-      await notifyFriendRequestAccepted(data.requester_id, profile.username);
+      await sendNotificationToUser(
+        data.requester_id,
+        '🎉 Friend Request Accepted',
+        `${profile.username} accepted your friend request!`,
+        { type: 'friend_accepted', friend_id: user.id, friend_name: profile.username }
+      );
     }
   }
 
@@ -121,4 +131,93 @@ export async function listIncomingFriendRequests() {
   })) as (Friendship & {
     requester: { id: string; username: string | null; avatar_url: string | null };
   })[];
+}
+
+/**
+ * Remove a friend (delete the friendship record)
+ */
+export async function removeFriend(friendId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+
+  // First, find the friendship record
+  const { data: friendship, error: findError } = await supabase
+    .from('friendships')
+    .select('id')
+    .or(`and(requester_id.eq.${user.id},addressee_id.eq.${friendId}),and(requester_id.eq.${friendId},addressee_id.eq.${user.id})`)
+    .eq('status', 'accepted')
+    .maybeSingle();
+
+  if (findError) {
+    console.error('Error finding friendship:', findError);
+    throw findError;
+  }
+
+  if (!friendship) {
+    console.log('No friendship found to delete');
+    return;
+  }
+
+  // Delete by ID
+  const { error: deleteError } = await supabase
+    .from('friendships')
+    .delete()
+    .eq('id', friendship.id);
+
+  if (deleteError) {
+    console.error('Error deleting friendship:', deleteError);
+    throw deleteError;
+  }
+
+  console.log('Friendship deleted successfully:', friendship.id);
+}
+
+/**
+ * Get friendship status with another user
+ */
+export async function getFriendshipStatus(
+  otherUserId: string
+): Promise<{ status: 'none' | 'pending_sent' | 'pending_received' | 'friends'; friendshipId?: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { status: 'none' };
+
+  // Check for any friendship record between the two users
+  const { data, error } = await supabase
+    .from('friendships')
+    .select('*')
+    .or(`and(requester_id.eq.${user.id},addressee_id.eq.${otherUserId}),and(requester_id.eq.${otherUserId},addressee_id.eq.${user.id})`)
+    .maybeSingle();
+
+  if (error || !data) return { status: 'none' };
+
+  if (data.status === 'accepted') {
+    return { status: 'friends', friendshipId: data.id };
+  }
+
+  if (data.status === 'pending') {
+    if (data.requester_id === user.id) {
+      return { status: 'pending_sent', friendshipId: data.id };
+    } else {
+      return { status: 'pending_received', friendshipId: data.id };
+    }
+  }
+
+  return { status: 'none' };
+}
+
+/**
+ * Cancel a pending friend request that you sent
+ */
+export async function cancelFriendRequest(friendshipId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+
+  const { error } = await supabase
+    .from('friendships')
+    .delete()
+    .eq('id', friendshipId)
+    .eq('requester_id', user.id)
+    .eq('status', 'pending');
+
+  if (error) throw error;
 }

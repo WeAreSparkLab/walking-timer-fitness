@@ -7,14 +7,18 @@ import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad, radius, paceColors } from '../lib/theme';
 import { getPlanById, removePlan, Pace } from '../lib/storage';
-import { 
+import {
   updateProgress, 
   getSessionProgress, 
   subscribeToProgress,
   SessionProgress,
   getSession,
   updateSessionControl,
-  subscribeToSessionControl
+  subscribeToSessionControl,
+  removeParticipant,
+  deleteSession,
+  joinSession,
+  leaveSession
 } from '../lib/api/sessions';
 import { sendMessage, subscribeMessages } from '../lib/api/messages';
 import { useMyProfile } from '../lib/useMyProfile';
@@ -115,8 +119,25 @@ export default function WalkTimer() {
   const [lastReadTime, setLastReadTime] = useState<string | null>(null);
   const { profile } = useMyProfile();
   const intervalRef = useRef<any>(null);
-  const isUpdatingControlRef = useRef(false);
   const scrollViewRef = useRef<any>(null);
+
+  // Auto-join session when arriving from notification click
+  useEffect(() => {
+    if (!sessionId || !profile?.id) return;
+    
+    const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
+    
+    (async () => {
+      try {
+        const joined = await joinSession(sid);
+        if (joined) {
+          console.log('✅ Auto-joined session from notification');
+        }
+      } catch (error) {
+        console.error('Failed to auto-join session:', error);
+      }
+    })();
+  }, [sessionId, profile?.id]);
 
   // Load plan or default (now includes warmup/cooldown)
   useEffect(() => {
@@ -238,14 +259,14 @@ export default function WalkTimer() {
     });
     
     const unsubscribeControl = subscribeToSessionControl(sid, (data) => {
-      // Ignore updates if we're the host making a change
-      if (isUpdatingControlRef.current) {
-        return;
+      console.log('Received session control update:', data);
+      // Non-hosts should sync their timer with the host's control
+      if (!isHost) {
+        console.log('Non-host syncing timer:', data);
+        setIsRunning(data.isRunning);
+        setCurrentInterval(data.currentInterval);
+        setIntervalTime(data.timeRemaining);
       }
-      // Apply host's control changes to all participants
-      setIsRunning(data.isRunning);
-      setCurrentInterval(data.currentInterval);
-      setIntervalTime(data.timeRemaining);
     });
     
     // Clean up all subscriptions
@@ -254,7 +275,7 @@ export default function WalkTimer() {
       unsubscribeMessages();
       unsubscribeControl();
     };
-  }, [sessionId]);
+  }, [sessionId, isHost]);
 
   // Auto-scroll to bottom when messages change or chat opens
   useEffect(() => {
@@ -323,10 +344,15 @@ export default function WalkTimer() {
     const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
     const broadcastInterval = setInterval(() => {
       updateProgress(sid, currentInterval, intervalTime, !isRunning).catch(console.error);
+      
+      // If host, also broadcast session control updates
+      if (isHost) {
+        updateSessionControl(sid, true, currentInterval, intervalTime).catch(console.error);
+      }
     }, 2000); // Update every 2 seconds
     
     return () => clearInterval(broadcastInterval);
-  }, [sessionId, isRunning, currentInterval, intervalTime]);
+  }, [sessionId, isRunning, currentInterval, intervalTime, isHost]);
 
   const resetTimer = () => {
     setIsRunning(false);
@@ -368,6 +394,44 @@ export default function WalkTimer() {
         router.replace('/dashboard');
       } catch (error) {
         console.error('Delete error:', error);
+      }
+    }
+  };
+
+  const handleLeaveSession = async () => {
+    if (!sessionId) return;
+    
+    const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
+    
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm('Are you sure you want to leave this group walk?')
+      : await new Promise((resolve) => {
+          Alert.alert(
+            'Leave Group Walk',
+            'Are you sure you want to leave this group walk?',
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Leave', style: 'destructive', onPress: () => resolve(true) },
+            ]
+          );
+        });
+    
+    if (confirmed) {
+      try {
+        await leaveSession(sid);
+        if (Platform.OS === 'web') {
+          window.alert('You have left the group walk');
+        } else {
+          Alert.alert('Left', 'You have left the group walk');
+        }
+        router.replace('/dashboard');
+      } catch (error: any) {
+        console.error('Failed to leave session:', error);
+        if (Platform.OS === 'web') {
+          window.alert(error.message || 'Failed to leave');
+        } else {
+          Alert.alert('Error', error.message || 'Failed to leave');
+        }
       }
     }
   };
@@ -416,6 +480,11 @@ export default function WalkTimer() {
               <Ionicons name="trash-outline" size={20} color={colors.danger} />
             </TouchableOpacity>
           </View>
+        ) : sessionId && !isHost ? (
+          <TouchableOpacity onPress={handleLeaveSession} style={styles.leaveBtn}>
+            <Ionicons name="exit-outline" size={18} color={colors.danger} />
+            <Text style={styles.leaveBtnText}>Leave</Text>
+          </TouchableOpacity>
         ) : (
           <View style={{ width: 36 }} />
         )}
@@ -435,6 +504,8 @@ export default function WalkTimer() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sessionParticipantsScroll}>
             {sessionParticipants.map((participant) => {
               const isParticipantHost = participant.user_id === sessionHostId;
+              const isCurrentUser = participant.user_id === profile?.id;
+              
               return (
                 <View key={participant.user_id} style={styles.sessionParticipantCard}>
                   <View style={styles.sessionParticipantAvatarContainer}>
@@ -459,6 +530,57 @@ export default function WalkTimer() {
                   <Text style={styles.sessionParticipantName} numberOfLines={1}>
                     {participant.username || 'User'}
                   </Text>
+                  
+                  {/* Remove button - only show if current user is host and participant is not host */}
+                  {isHost && !isParticipantHost && !isCurrentUser && (
+                    <TouchableOpacity
+                      onPress={async () => {
+                        const confirmed = Platform.OS === 'web'
+                          ? window.confirm(`Remove ${participant.username || 'User'} from this walk?`)
+                          : await new Promise<boolean>(resolve => {
+                              Alert.alert(
+                                'Remove Participant',
+                                `Remove ${participant.username || 'User'} from this walk?`,
+                                [
+                                  { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+                                  { text: 'Remove', style: 'destructive', onPress: () => resolve(true) },
+                                ]
+                              );
+                            });
+                        
+                        if (confirmed && sessionId) {
+                          try {
+                            const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
+                            await removeParticipant(sid, participant.user_id);
+                            // Refresh participants list
+                            const { data: updatedParticipants } = await supabase
+                              .from('session_participants')
+                              .select('user_id')
+                              .eq('session_id', sid);
+                            
+                            if (updatedParticipants) {
+                              const userIds = updatedParticipants.map(p => p.user_id);
+                              const { data: profiles } = await supabase
+                                .from('profiles')
+                                .select('id, username, avatar_url')
+                                .in('id', userIds);
+                              
+                              setSessionParticipants((profiles || []).map(p => ({
+                                user_id: p.id,
+                                username: p.username,
+                                avatar_url: p.avatar_url,
+                              })));
+                            }
+                          } catch (error) {
+                            console.error('Failed to remove participant:', error);
+                          }
+                        }
+                      }}
+                      style={styles.removeParticipantBtn}
+                    >
+                      <Ionicons name="close-circle" size={20} color={colors.danger} />
+                    </TouchableOpacity>
+                  )}
                 </View>
               );
             })}
@@ -621,14 +743,9 @@ export default function WalkTimer() {
             if (sessionId) {
               const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
               try {
-                isUpdatingControlRef.current = true;
                 await updateSessionControl(sid, newRunning, currentInterval, intervalTime);
-                setTimeout(() => {
-                  isUpdatingControlRef.current = false;
-                }, 500);
               } catch (error) {
                 console.error('Failed to sync play/pause:', error);
-                isUpdatingControlRef.current = false;
               }
             }
           }}
@@ -654,14 +771,9 @@ export default function WalkTimer() {
           if (sessionId) {
             const sid = typeof sessionId === 'string' ? sessionId : sessionId[0];
             try {
-              isUpdatingControlRef.current = true;
               await updateSessionControl(sid, false, 0, intervals[0]?.duration ?? 0);
-              setTimeout(() => {
-                isUpdatingControlRef.current = false;
-              }, 500);
             } catch (error) {
               console.error('Failed to sync reset:', error);
-              isUpdatingControlRef.current = false;
             }
           }
         }} style={[styles.ctrlOutline, { flex: 1, opacity: sessionId && !isHost ? 0.5 : 1 }]} activeOpacity={0.85}>
@@ -782,6 +894,8 @@ const styles = StyleSheet.create({
   headerTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
   iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  leaveBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(255,59,48,0.15)', borderWidth: 1, borderColor: 'rgba(255,59,48,0.3)' },
+  leaveBtnText: { color: colors.danger, fontSize: 13, fontWeight: '600', marginLeft: 4 },
 
   sessionParticipantsContainer: {
     marginTop: 16,
@@ -804,6 +918,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 16,
     width: 60,
+    position: 'relative', // Allow absolute positioning for remove button
+  },
+  removeParticipantBtn: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: colors.bg,
+    borderRadius: 10,
+    padding: 2,
   },
   sessionParticipantAvatarContainer: {
     width: 44,
