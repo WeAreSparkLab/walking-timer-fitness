@@ -1,4 +1,25 @@
 // app/user/[userId].tsx
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Image, Alert, Platform } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, pad, radius, shadow } from '../../lib/theme';
+import { supabase } from '../../lib/supabaseClient';
+import { 
+  getFriendshipStatus, 
+  sendFriendRequest, 
+  removeFriend, 
+  respondToFriendRequest,
+  cancelFriendRequest 
+} from '../../lib/api/friends';
+import { getUserStatsById, getUserLeaderboardPosition, formatDuration } from '../../lib/api/stats';
+
+type UserProfile = {
+  id: string;
+  username: string | null;
+  avatar_url: string | null;
+  email: string | null;
 };
 
 type FriendStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
@@ -6,6 +27,15 @@ type FriendStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
 export default function UserProfilePage() {
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId: string }>();
+
+  // Smart back navigation: go back if possible, else go to dashboard
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history && window.history.length > 1) {
+      router.back();
+    } else {
+      router.replace('/dashboard');
+    }
+  };
   
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<any>(null);

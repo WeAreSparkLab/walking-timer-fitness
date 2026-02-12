@@ -1,3 +1,16 @@
+import { Stack, useRouter } from "expo-router";
+import { StatusBar } from 'expo-status-bar';
+import { colors } from '../lib/theme';
+import { useEffect } from 'react';
+import { addNotificationResponseListener } from '../lib/notifications';
+import type { NotificationResponse } from 'expo-notifications';
+import InstallPrompt from '../lib/InstallPrompt';
+import { Platform } from 'react-native';
+import { requestNotificationPermission } from '../lib/webNotifications';
+
+export default function RootLayout() {
+  const router = useRouter();
+
   // Ensure web push subscription is created after permission is granted
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -13,18 +26,6 @@
       };
     }
   }, []);
-import { Stack, useRouter } from "expo-router";
-import { StatusBar } from 'expo-status-bar';
-import { colors } from '../lib/theme';
-import { useEffect } from 'react';
-import { addNotificationResponseListener } from '../lib/notifications';
-import type { NotificationResponse } from 'expo-notifications';
-import InstallPrompt from '../lib/InstallPrompt';
-import { Platform } from 'react-native';
-import { requestNotificationPermission } from '../lib/webNotifications';
-
-export default function RootLayout() {
-  const router = useRouter();
 
   // Inject manifest link into document head
   useEffect(() => {
