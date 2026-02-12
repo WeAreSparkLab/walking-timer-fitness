@@ -1,0 +1,19 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # Runs every 6 days at 8am UTC to keep project active
+    - cron: '0 8 */6 * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase to prevent sleep
+        run: |
+          curl -X GET "https://aysyggpgusqxhiuankti.supabase.co/rest/v1/" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -w "\nHTTP Status: %{http_code}\n"
+          echo "✅ Supabase pinged successfully"
