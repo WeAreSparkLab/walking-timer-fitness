@@ -1,13 +1,14 @@
 // Service Worker for PWA
-const CACHE_NAME = 'spark-walk-v1';
+const CACHE_NAME = 'spark-walk-v2';
+const SW_VERSION = '2.0.0';
 
 self.addEventListener('install', (event) => {
-  console.log('Service Worker installing.');
+  console.log(`Service Worker v${SW_VERSION} installing.`);
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker activating.');
+  console.log(`Service Worker v${SW_VERSION} activating.`);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -29,7 +30,8 @@ self.addEventListener('fetch', (event) => {
 
 // Handle push notifications
 self.addEventListener('push', (event) => {
-  console.log('Push notification received:', event);
+  console.log(`[SW v${SW_VERSION}] Push notification received!`);
+  console.log('[SW] Event data exists:', !!event.data);
   
   let notificationData = {
     title: 'New Notification',
@@ -42,7 +44,10 @@ self.addEventListener('push', (event) => {
   // Try to parse the push data
   if (event.data) {
     try {
-      const payload = event.data.json();
+      const rawText = event.data.text();
+      console.log('[SW] Raw push data:', rawText);
+      const payload = JSON.parse(rawText);
+      console.log('[SW] Parsed payload:', payload);
       notificationData = {
         title: payload.title || notificationData.title,
         body: payload.body || notificationData.body,
@@ -51,11 +56,11 @@ self.addEventListener('push', (event) => {
         data: payload.data || notificationData.data,
       };
     } catch (error) {
-      console.error('Failed to parse push data:', error);
+      console.error('[SW] Failed to parse push data:', error);
     }
   }
 
-  console.log('Showing notification:', notificationData);
+  console.log('[SW] Showing notification:', notificationData.title, '-', notificationData.body);
 
   event.waitUntil(
     self.registration.showNotification(notificationData.title, {
