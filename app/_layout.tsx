@@ -11,19 +11,13 @@ import { requestNotificationPermission } from '../lib/webNotifications';
 export default function RootLayout() {
   const router = useRouter();
 
-  // Ensure web push subscription is created after permission is granted
+  // Ensure web push subscription is created after permission is granted (one-time check)
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      const onPermissionChange = async () => {
-        if (Notification.permission === 'granted') {
-          const { subscribeToWebPush } = await import('../lib/webNotifications');
-          await subscribeToWebPush();
-        }
-      };
-      document.addEventListener('visibilitychange', onPermissionChange);
-      return () => {
-        document.removeEventListener('visibilitychange', onPermissionChange);
-      };
+    if (Platform.OS === 'web' && Notification.permission === 'granted') {
+      (async () => {
+        const { subscribeToWebPush } = await import('../lib/webNotifications');
+        await subscribeToWebPush();
+      })();
     }
   }, []);
 

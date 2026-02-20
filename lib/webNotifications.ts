@@ -60,13 +60,36 @@ export async function subscribeToWebPush(): Promise<void> {
     // Check for existing subscription
     const existingSubscription = await registration.pushManager.getSubscription();
     if (existingSubscription) {
-      // Force unsubscribe and create fresh subscription with current VAPID key
-      console.log('🔄 Unsubscribing old push subscription to refresh with current VAPID key...');
-      await existingSubscription.unsubscribe();
-      console.log('✅ Old subscription removed');
+      // Already have a subscription - check if it's saved to the database
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('web_push_subscription')
+          .eq('id', user.id)
+          .single();
+        
+        // If subscription is already saved and matches, we're done
+        if (profile?.web_push_subscription?.endpoint === existingSubscription.endpoint) {
+          console.log('✅ Push subscription already exists and is saved');
+          return;
+        }
+        
+        // Subscription exists but not saved - save it
+        console.log('📝 Saving existing push subscription to database...');
+        const { error } = await supabase
+          .from('profiles')
+          .update({ web_push_subscription: existingSubscription.toJSON() })
+          .eq('id', user.id);
+        
+        if (!error) {
+          console.log('✅ Web push subscription saved');
+        }
+      }
+      return;
     }
 
-    // Subscribe to push notifications with VAPID key
+    // No existing subscription - create new one
     console.log('🔑 Creating new push subscription with VAPID key:', vapidPublicKey.substring(0, 20) + '...');
     
     const subscription = await registration.pushManager.subscribe({
