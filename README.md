@@ -60,7 +60,7 @@ A social interval walking app built with Expo that helps you maintain fitness th
 - **Styling**: React Native StyleSheet with custom theme
 - **State**: AsyncStorage (local) + Supabase (remote)
 
-## Getting Started
+## Getting Started (Setup)
 
 ### 1. Install Dependencies
 
@@ -70,11 +70,15 @@ npm install
 
 ### 2. Configure Environment Variables
 
-Create a `.env` file:
+Copy `.env.example` to `.env` and fill in your own Supabase values (Project Settings -> API). Use the anon/public key only; never the `service_role` key. `.env` is gitignored and must not be committed.
+
+```bash
+cp .env.example .env
+```
 
 ```env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+EXPO_PUBLIC_SUPABASE_URL=YOUR_PROJECT_URL
+EXPO_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
 ```
 
 ### 3. Setup Supabase Database

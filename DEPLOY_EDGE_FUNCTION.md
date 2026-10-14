@@ -3,7 +3,7 @@
 ## Method 1: Via Supabase Dashboard (EASIEST - Recommended)
 
 ### 1. Open Supabase Dashboard
-Go to https://supabase.com/dashboard/project/lzxiipvflwsckygbovnz
+Go to https://supabase.com/dashboard/project/YOUR_PROJECT_REF
 
 ### 2. Navigate to Edge Functions
 - Click "Edge Functions" in the left sidebar
@@ -19,9 +19,9 @@ Go to https://supabase.com/dashboard/project/lzxiipvflwsckygbovnz
 Go to Supabase Dashboard → Settings → Edge Functions → Add secrets:
 
 ```
-VAPID_PUBLIC_KEY=BKGexLVJAd9Z0oQQuOBXyFL6ygaNrDpcnRi0Ij80CKpgJHZIXsy07Wo5zhyr8h6RKhNU-5yn4MEr1vFpfgCIpAc
+VAPID_PUBLIC_KEY=YOUR_VAPID_PUBLIC_KEY
 
-VAPID_PRIVATE_KEY=Yt7hS8FFbww3Yo3QzVUOAnbsHBJzGiyq4L2Zcpe1g8Y
+VAPID_PRIVATE_KEY=YOUR_VAPID_PRIVATE_KEY
 
 VAPID_SUBJECT=mailto:your-email@example.com
 ```
@@ -54,7 +54,7 @@ supabase functions deploy send-notification
 ## Test the Function
 
 ```bash
-curl -X POST 'https://lzxiipvflwsckygbovnz.supabase.co/functions/v1/send-notification' \
+curl -X POST 'YOUR_PROJECT_URL/functions/v1/send-notification' \
   -H 'Authorization: Bearer YOUR_ANON_KEY' \
   -H 'Content-Type: application/json' \
   -d '{
@@ -79,7 +79,7 @@ curl -X POST 'https://lzxiipvflwsckygbovnz.supabase.co/functions/v1/send-notific
 After deployment, you should see the function listed in your Supabase Dashboard under Edge Functions. The URL will be:
 
 ```
-https://lzxiipvflwsckygbovnz.supabase.co/functions/v1/send-notification
+YOUR_PROJECT_URL/functions/v1/send-notification
 ```
 
 This URL is already configured in the app code!

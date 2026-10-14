@@ -9,7 +9,7 @@
 
 ## Fix 1: Enable Email Authentication
 
-1. Go to: https://supabase.com/dashboard/project/aysyggpgusqxhiuankti/auth/providers
+1. Go to: https://supabase.com/dashboard/project/YOUR_PROJECT_REF/auth/providers
 2. Find **Email** in the list
 3. Click the toggle or edit button to enable it
 4. **IMPORTANT**: Under "Email" settings:
@@ -20,7 +20,7 @@
 
 ## Fix 2: Create Avatars Storage Bucket
 
-1. Go to: https://supabase.com/dashboard/project/aysyggpgusqxhiuankti/storage/buckets
+1. Go to: https://supabase.com/dashboard/project/YOUR_PROJECT_REF/storage/buckets
 2. Click **"New bucket"** button (top right)
 3. Fill in:
    ```
@@ -82,6 +82,6 @@ The fix above (disabling "Confirm email") should solve it.
 
 ## Quick Links
 
-- [Authentication Providers](https://supabase.com/dashboard/project/aysyggpgusqxhiuankti/auth/providers)
-- [Storage Buckets](https://supabase.com/dashboard/project/aysyggpgusqxhiuankti/storage/buckets)
-- [Your Supabase Dashboard](https://supabase.com/dashboard/project/aysyggpgusqxhiuankti)
+- [Authentication Providers](https://supabase.com/dashboard/project/YOUR_PROJECT_REF/auth/providers)
+- [Storage Buckets](https://supabase.com/dashboard/project/YOUR_PROJECT_REF/storage/buckets)
+- [Your Supabase Dashboard](https://supabase.com/dashboard/project/YOUR_PROJECT_REF)

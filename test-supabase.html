@@ -81,11 +81,11 @@
         <h2>Configuration</h2>
         <div class="form-group">
             <label>Supabase URL:</label>
-            <input type="text" id="supabaseUrl" value="https://aysyggpgusqxhiuankti.supabase.co" />
+            <input type="text" id="supabaseUrl" placeholder="YOUR_PROJECT_URL" />
         </div>
         <div class="form-group">
             <label>Supabase Anon Key:</label>
-            <input type="text" id="supabaseKey" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5c3lnZ3BndXNxeGhpdWFua3RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAyNTc0MDAsImV4cCI6MjA2NTgzMzQwMH0.jD9ARH2kLm2qZ_jQ34UrcP_atVzE5lFmG98SZLyxZzQ" />
+            <input type="text" id="supabaseKey" placeholder="YOUR_ANON_KEY" />
         </div>
         <button onclick="runAllTests()">🚀 Run All Tests</button>
         <button onclick="testSignUp()">Test Sign Up</button>
@@ -338,7 +338,7 @@ CREATE POLICY "Users can insert own profile"
                         </ul>
                     </li>
                 </ol>
-                <p><strong>Your Supabase URL:</strong> <a href="https://supabase.com/dashboard/project/aysyggpgusqxhiuankti" target="_blank" style="color: #00EAFF;">Open Dashboard</a></p>
+                <p><strong>Your Supabase URL:</strong> <a href="https://supabase.com/dashboard/project/YOUR_PROJECT_REF" target="_blank" style="color: #00EAFF;">Open Dashboard</a></p>
             `;
             document.getElementById('results').appendChild(setup);
         }
