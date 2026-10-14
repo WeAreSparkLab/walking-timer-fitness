@@ -7,7 +7,7 @@ Your user authentication is connecting to **Supabase**, but the database needs t
 ## Current Status
 
 ✅ **Supabase Client Configured**
-- URL: `https://aysyggpgusqxhiuankti.supabase.co`
+- URL: `YOUR_PROJECT_URL`
 - Anon Key: Present in `.env` file
 
 ❓ **Database Setup** - Needs verification
@@ -18,7 +18,7 @@ Your user authentication is connecting to **Supabase**, but the database needs t
 
 ### 1️⃣ Enable Email Authentication
 
-1. Go to your [Supabase Dashboard](https://supabase.com/dashboard/project/aysyggpgusqxhiuankti)
+1. Go to your [Supabase Dashboard](https://supabase.com/dashboard/project/YOUR_PROJECT_REF)
 2. Click **Authentication** → **Providers**
 3. Find **Email** provider and click **Edit**
 4. Make sure:
@@ -147,7 +147,7 @@ User is logged in ✅
 ## Need Help?
 
 1. **Run the test**: Open `test-supabase.html` in your browser
-2. **Check the dashboard**: [https://supabase.com/dashboard/project/aysyggpgusqxhiuankti](https://supabase.com/dashboard/project/aysyggpgusqxhiuankti)
+2. **Check the dashboard**: [https://supabase.com/dashboard/project/YOUR_PROJECT_REF](https://supabase.com/dashboard/project/YOUR_PROJECT_REF)
 3. **Review error messages** in the browser console (F12)
 
 ---

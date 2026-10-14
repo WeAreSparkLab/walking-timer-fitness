@@ -60,7 +60,7 @@ A social interval walking app built with Expo that helps you maintain fitness th
 - **Styling**: React Native StyleSheet with custom theme
 - **State**: AsyncStorage (local) + Supabase (remote)
 
-## Getting Started
+## Getting Started (Setup)
 
 ### 1. Install Dependencies
 
@@ -70,18 +70,26 @@ npm install
 
 ### 2. Configure Environment Variables
 
-Create a `.env` file:
+Copy `.env.example` to `.env` and fill in your own Supabase values (Project Settings -> API). Use the anon/public key only; never the `service_role` key. `.env` is gitignored and must not be committed.
+
+```bash
+cp .env.example .env
+```
 
 ```env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+EXPO_PUBLIC_SUPABASE_URL=YOUR_PROJECT_URL
+EXPO_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
 ```
 
 ### 3. Setup Supabase Database
 
-Run the SQL scripts in your Supabase SQL Editor:
+Create a Supabase project, then run one file in the SQL Editor:
 
-```sql
+```
+supabase/migrations/20261014_consolidated_schema.sql
+```
+
+It creates every table the app uses, turns on Row Level Security with policies for each one, sets up the `avatars` storage bucket, enables realtime, and keeps leaderboard stats up to date with a trigger. No anonymous access is granted. The older files in `sql/` are kept for history only; do not run them.sql
 -- 1. Add profile columns
 -- Run: sql/add-missing-columns.sql
 
