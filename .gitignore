@@ -27,3 +27,15 @@ expo-env.d.ts
 
 .vercel
 .env*.local
+
+# Firebase service account keys - NEVER commit these
+*firebase-adminsdk*.json
+*service-account*.json
+
+# Environment files - never commit real values
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
