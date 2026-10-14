@@ -83,9 +83,13 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
 
 ### 3. Setup Supabase Database
 
-Run the SQL scripts in your Supabase SQL Editor:
+Create a Supabase project, then run one file in the SQL Editor:
 
-```sql
+```
+supabase/migrations/20261014_consolidated_schema.sql
+```
+
+It creates every table the app uses, turns on Row Level Security with policies for each one, sets up the `avatars` storage bucket, enables realtime, and keeps leaderboard stats up to date with a trigger. No anonymous access is granted. The older files in `sql/` are kept for history only; do not run them.sql
 -- 1. Add profile columns
 -- Run: sql/add-missing-columns.sql
 
