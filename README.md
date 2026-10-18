@@ -1,328 +1,64 @@
-# Spark Walk - Interval Walking Timer 🚶‍♂️
+# Spark Walk
 
-A social interval walking app built with Expo that helps you maintain fitness through synchronized group walks with friends. Walk together even when you're apart!
+**A social interval-walking app: build a walking plan, then walk it in sync with friends, with live progress and chat.**
+
+**Live demo:** [walks.wearesparklab.com](https://walks.wearesparklab.com/)
+
+Built with Expo (React Native + TypeScript) and Supabase. One codebase runs on web (deployed to Vercel), iOS and Android.
 
 ## Features
 
-### 🏃 Smart Interval Timer
-- Configurable walking intervals (warmup, slow pace, fast pace, cooldown)
-- Visual progress indicators showing current pace
-- Audio beeps for pace transitions (platform-aware)
-- Default 21-minute walk (7 intervals × 3 minutes each)
-- Save and edit custom walk plans
+- **Interval timer:** warm-up, slow and fast pace, and cool-down phases with audio cues and visual progress. The default is a 21-minute walk (7 x 3 minutes), and you can save custom plans.
+- **Group walks:** start a session, share an invite link and walk together. Participants see each other's progress in real time.
+- **In-walk chat and direct messages** between friends.
+- **Friends:** search users, send and accept requests, view profiles and a leaderboard.
+- **Push notifications:** friend requests, group walk invites and new messages (web push and native).
+- **Accounts:** email/password auth, profiles with avatar upload, and Row Level Security on every table.
 
-### 👥 Group Walks
-- **Real-time Synchronization**: Start walks together with friends
-- **Live Participant Tracking**: See everyone's progress in real-time
-- **In-Walk Chat**: Send messages during walks with floating chat button
-- **Invite System**: Generate shareable links with unique tokens
-- **Deep Linking**: Join walks instantly via `sparkwalk://join/{token}`
+## Tech stack
 
-### 💬 Social Features
-- **Friend Discovery**: Search all users by username or email
-- **Friend Requests**: Send and receive friend requests
-- **Friend Management**: View your friends list and pending requests
-- **Push Notifications**: Get notified about:
-  - Friend requests received
-  - Friend requests accepted
-  - Friends starting group walks
-  - New chat messages during walks
+| Area | Tools |
+|---|---|
+| App | Expo SDK 54, React Native 0.81, React 19, TypeScript, expo-router (file-based routing) |
+| Backend | Supabase: Postgres, Auth, Realtime, Storage, Edge Functions |
+| Notifications | expo-notifications, Firebase Cloud Messaging, Web Push (Supabase Edge Function `send-notification`) |
+| Hosting | Vercel (web export), EAS Build (native) |
+| CI | GitHub Actions workflow that keeps the free-tier Supabase project from pausing |
 
-### 👤 Profile Management
-- Custom avatars (upload to Supabase Storage)
-- Username and bio
-- Public profile visibility
-- Session persistence
-
-### 🔐 Authentication
-- Email/password authentication via Supabase Auth
-- Secure session management
-- Row Level Security (RLS) on all database tables
-- Protected routes with authentication gates
-
-### 🌐 Multi-Platform Support
-- **Web**: Metro bundler with static export for Vercel deployment
-- **iOS**: Native app with haptics and native features
-- **Android**: Material Design 3 with edge-to-edge display
-- Platform-specific optimizations (haptics, audio, alerts)
-
-## Tech Stack
-
-- **Framework**: Expo SDK 54.0.7
-- **Navigation**: expo-router 6.0.4 (file-based routing)
-- **Backend**: Supabase
-  - PostgreSQL database
-  - Real-time subscriptions
-  - Authentication
-  - Storage (avatars)
-- **Audio**: expo-av + Web Audio API
-- **Notifications**: expo-notifications
-- **Styling**: React Native StyleSheet with custom theme
-- **State**: AsyncStorage (local) + Supabase (remote)
-
-## Getting Started (Setup)
-
-### 1. Install Dependencies
+## Run it locally
 
 ```bash
+git clone https://github.com/WeAreSparkLab/walking-timer-fitness.git
+cd walking-timer-fitness
 npm install
+cp .env.example .env     # add your Supabase URL and anon key
+npx expo start           # press w for web, i for iOS, a for Android
 ```
 
-### 2. Configure Environment Variables
+1. Create a free Supabase project.
+2. In **Project Settings -> API**, copy the project URL and the **anon/public** key into `.env`. Never use the `service_role` key in the app.
+3. In the SQL Editor, run `supabase/migrations/20261014_consolidated_schema.sql`. It creates the tables, RLS policies, the avatars bucket, realtime and the leaderboard trigger. The other files in `sql/` are history only.
 
-Copy `.env.example` to `.env` and fill in your own Supabase values (Project Settings -> API). Use the anon/public key only; never the `service_role` key. `.env` is gitignored and must not be committed.
+## How it works
+
+- `app/` holds the screens (dashboard, timer, create walk, friends, chat, leaderboard, profile, join-by-invite).
+- `lib/api/` holds the data layer: sessions, friends, invites, messages, notifications and stats.
+- **Group sync:** the host's session is a row in Postgres, and each participant writes progress to it. Everyone else subscribes via Supabase Realtime.
+- **Invites:** a unique token creates a shareable link that deep-links into the app (`walking-timer-fitness://join/<token>`) or the web app.
+- **Security:** the client only ever holds the anon key. Access control lives in RLS policies, not in the client.
+
+## Deploy
 
 ```bash
-cp .env.example .env
-```
-
-```env
-EXPO_PUBLIC_SUPABASE_URL=YOUR_PROJECT_URL
-EXPO_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
-```
-
-### 3. Setup Supabase Database
-
-Create a Supabase project, then run one file in the SQL Editor:
-
-```
-supabase/migrations/20261014_consolidated_schema.sql
-```
-
-It creates every table the app uses, turns on Row Level Security with policies for each one, sets up the `avatars` storage bucket, enables realtime, and keeps leaderboard stats up to date with a trigger. No anonymous access is granted. The older files in `sql/` are kept for history only; do not run them.sql
--- 1. Add profile columns
--- Run: sql/add-missing-columns.sql
-
--- 2. Create group walk tables
--- Run: sql/create-group-walk-tables.sql
-
--- 3. Add push notification support
--- Run: sql/add-push-token.sql
-```
-
-### 4. Configure Expo Project ID
-
-In `app.json`, replace the project ID:
-
-```json
-"extra": {
-  "eas": {
-    "projectId": "your-expo-project-id-here"
-  }
-}
-```
-
-Get your project ID by running:
-```bash
-npx expo login
-npx eas init
-```
-
-### 5. Start Development Server
-
-```bash
-npx expo start
-```
-
-Choose platform:
-- Press `w` for web
-- Press `i` for iOS simulator
-- Press `a` for Android emulator
-
-## Database Schema
-
-### Tables
-
-- **profiles**: User profiles with username, bio, avatar, push token
-- **sessions**: Group walk sessions with interval plans
-- **session_participants**: Session membership
-- **session_progress**: Real-time position tracking
-- **session_invites**: Shareable invite tokens
-- **session_messages**: In-walk chat messages
-- **friendships**: Friend relationships (pending/accepted/blocked)
-
-### Real-time Subscriptions
-
-- Session progress updates (every 2 seconds during walks)
-- Chat messages (instant delivery)
-- Friend requests (live notifications)
-
-## Project Structure
-
-```
-app/
-  _layout.tsx          # Root layout with notification handling
-  index.tsx            # Login/signup screen
-  dashboard.tsx        # Home screen with stats and actions
-  walk-timer.tsx       # Main timer with group sync and chat
-  create-walk.tsx      # Custom walk plan creator
-  profile.tsx          # User profile editor
-  friends.tsx          # Friend discovery and management
-  start-group-walk.tsx # Session creation screen
-  join/
-    [token].tsx        # Deep link handler for invites
-
-lib/
-  supabaseClient.ts    # Supabase initialization
-  storage.ts           # AsyncStorage helpers for local walks
-  theme.ts             # Design system (colors, spacing, shadows)
-  notifications.ts     # Push notification service
-  useMyProfile.ts      # Profile data hook
-  api/
-    sessions.ts        # Group walk session API
-    friends.ts         # Friend request API
-    invites.ts         # Invite token API
-    messages.ts        # Chat message API
-    profile.ts         # Profile management API
-
-sql/
-  add-missing-columns.sql       # Profile schema updates
-  create-group-walk-tables.sql  # Group walk infrastructure
-  add-push-token.sql            # Push notification support
-```
-
-## Deployment
-
-### Web (Vercel)
-
-Configuration in `vercel.json`:
-
-```bash
-# Build for web
-npx expo export -p web
-
-# Deploy to Vercel
+npm run build      # static web export to dist/
 vercel deploy
 ```
 
-### Mobile (EAS Build)
+Native builds use `eas build --platform ios|android`.
 
-```bash
-# iOS
-eas build --platform ios
+## What I'd improve next
 
-# Android
-eas build --platform android
-```
-
-## Key Features Implementation
-
-### Group Walk Flow
-
-1. User creates session in `start-group-walk.tsx`
-2. Generates invite token via `createInvite()`
-3. Shares link with friends
-4. Friends join via deep link → `join/[token].tsx` → `redeemInviteToken()`
-5. All participants start walk → `walk-timer.tsx` with `sessionId`
-6. Real-time progress broadcast via `updateProgress()` every 2 seconds
-7. Live chat with `sendMessage()` and `subscribeMessages()`
-
-### Notification System
-
-1. Request permissions on sign-in → `initializePushNotifications()`
-2. Save Expo push token to profile
-3. Trigger notifications on events:
-   - Friend request: `notifyFriendRequest()`
-   - Friend accepted: `notifyFriendRequestAccepted()`
-   - Group walk invite: `notifyFriendsOfGroupWalk()`
-   - Chat message: `notifyNewChatMessage()`
-4. Handle taps in `_layout.tsx` → navigate to relevant screen
-
-### Friend Discovery
-
-1. Search users by username/email in `friends.tsx`
-2. Send request → `sendFriendRequest()` → triggers notification
-3. Recipient sees in "Requests" tab
-4. Accept/reject → `respondToFriendRequest()` → triggers notification
-5. View friends in "My Friends" tab
-
-## Development Notes
-
-### Platform-Specific Code
-
-Use `Platform.OS` checks for mobile-only features:
-
-```typescript
-// Haptics (mobile only)
-if (Platform.OS !== 'web') {
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-}
-
-// Alerts (web uses window.confirm)
-if (Platform.OS === 'web') {
-  if (window.confirm('Are you sure?')) { /* ... */ }
-} else {
-  Alert.alert('Confirm', 'Are you sure?', [/* ... */]);
-}
-```
-
-### Real-time Subscriptions
-
-Always clean up subscriptions:
-
-```typescript
-useEffect(() => {
-  const unsubscribe = subscribeToProgress(sessionId, handleUpdate);
-  return () => unsubscribe();
-}, [sessionId]);
-```
-
-### Supabase RLS Policies
-
-All tables have Row Level Security enabled. User ID must be in:
-- INSERT payload for ownership checks
-- WHERE clauses for query filters
-- JOIN conditions for related data
-
-## Troubleshooting
-
-### Push Notifications Not Working
-
-1. Check project ID in `app.json`
-2. Verify `push_token` column exists in profiles table
-3. Run `initializePushNotifications()` after sign-in
-4. Check Expo push notification status: https://expo.dev/notifications
-
-### Real-time Not Updating
-
-1. Verify Realtime is enabled in Supabase project settings
-2. Check table has `REPLICA IDENTITY FULL` for UPDATE events
-3. Ensure RLS policies allow SELECT for subscriptions
-4. Check browser console for subscription errors
-
-### Deep Links Not Working
-
-1. Verify `scheme` in app.json: `"walking-timer-fitness"`
-2. Test with: `npx uri-scheme open walking-timer-fitness://join/abc123 --ios`
-3. Check `app/join/[token].tsx` is receiving token parameter
-
-## Contributing
-
-This app was built iteratively with the following progression:
-
-1. ✅ Web configuration and platform compatibility
-2. ✅ Authentication system with validation
-3. ✅ Supabase database and storage setup
-4. ✅ Profile management
-5. ✅ Walk timer with audio feedback
-6. ✅ Custom walk plans with edit/delete
-7. ✅ Group walk infrastructure
-8. ✅ Real-time progress synchronization
-9. ✅ In-walk chat system
-10. ✅ Friend discovery and requests
-11. ✅ Push notifications
-
-## License
-
-This project is built with Expo and uses Supabase for backend services.
-
-## Support
-
-For issues or questions:
-- Check Expo documentation: https://docs.expo.dev
-- Supabase docs: https://supabase.com/docs
-- File an issue on GitHub
-
----
-
-Built with ❤️ using Expo and Supabase
+- Add automated tests for the session-sync logic and the RLS policies.
+- Consolidate the setup guides in the repo root into a single `docs/` folder.
+- Replace the 2-second progress writes with Realtime broadcast to cut database load.
+- Publish the native apps to the app stores.
