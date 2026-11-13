@@ -182,7 +182,7 @@ export default function DirectChat() {
 
 const styles = StyleSheet.create({
   container: { width: '100%', maxWidth: 600, alignSelf: 'center',  flex: 1, backgroundColor: colors.bg },
-  bgGlow: { opacity: 0.3,  position: 'absolute' as any, top: 0, left: 0, right: 0, height: 400, opacity: 0.3 },
+  bgGlow: { display: 'none',  opacity: 0.3,  position: 'absolute' as any, top: 0, left: 0, right: 0, height: 400, opacity: 0.3 },
   
   header: {
     flexDirection: 'row',

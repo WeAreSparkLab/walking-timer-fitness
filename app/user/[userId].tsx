@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bgGlow: { opacity: 0.3, 
+  bgGlow: { display: 'none',  opacity: 0.3, 
     position: 'absolute',
     width: '120%',
     height: '120%',
