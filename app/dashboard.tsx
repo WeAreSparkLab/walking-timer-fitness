@@ -1,5 +1,5 @@
 // app/dashboard.tsx — Spark Walk home (Phase 1 redesign).
-// The previous dashboard lives at /classic-dashboard and is still reachable.
+// (The previous dashboard was retired; /classic-dashboard redirects here.)
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, Image, ActivityIndicator, Platform } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -177,7 +177,6 @@ export default function Dashboard() {
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Button label="Friends" icon="heart-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/friends')} />
           <Button label="Profile" icon="person-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/profile')} />
-          <Button label="Classic" icon="albums-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} a11yHint="Opens the previous home screen" onPress={() => router.push('/classic-dashboard')} />
         </View>
 
         {/* Invitations */}
@@ -227,7 +226,7 @@ export default function Dashboard() {
 
         {/* Group walks */}
         {groups.length ? (
-          <Section title="Your group walks" action={{ label: 'Manage', icon: 'settings-outline', onPress: () => router.push('/classic-dashboard') }}>
+          <Section title="Your group walks" action={{ label: 'New', icon: 'add', onPress: () => router.push('/start-group-walk') }}>
             {groups.slice(0, 3).map(g => (
               <Card key={g.id} onPress={() => router.push({ pathname: '/walk-timer', params: { sessionId: g.id } })} label={`Open group walk ${g.name || ''}`}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 }}>
