@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import type { Pace } from '../storage';
 
 let ctx: AudioContext | null = null;
+export const getAudioContext = () => ctx;
 
 /** Call from a user gesture (Start / Resume) so browsers allow sound later. */
 export function unlockAudio() {

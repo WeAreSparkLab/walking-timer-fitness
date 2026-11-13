@@ -14,6 +14,10 @@ import { PRESETS, PHASE_COPY, Segment, buildSegments, fmtClock, fmtMinutes, segm
 import { useWalkClock, loadActiveWalk, saveActiveWalk, elapsedMs, ClockState } from '../lib/walk/engine';
 import { buzz, capabilities, chime, createWakeLock, speak, unlockAudio } from '../lib/walk/cues';
 import { getPlanById } from '../lib/storage';
+import { backgroundAudioSupported, cancelScheduled, clearLockScreen, scheduleCues, setLockScreen, startKeepAlive, stopKeepAlive } from '../lib/walk/backgroundAudio';
+
+const bgAudio = backgroundAudioSupported();
+const isVisible = () => typeof document === 'undefined' || document.visibilityState === 'visible';
 import { recordWalkActivity } from '../lib/api/stats';
 
 /** How fast the world moves past in each phase (1 = gentle stroll). */
@@ -106,32 +110,55 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
     if (lastIdx.current !== phase.index) {
       const first = lastIdx.current === null;
       lastIdx.current = phase.index;
+      // Chimes after the first are pre-scheduled on the audio clock (they play
+      // even when the phone is locked), so only play them here as a fallback.
+      const chimeNow = prefs.chime && (first || !bgAudio);
       if (phase.done) {
-        if (prefs.chime) chime('DONE', v);
+        if (chimeNow) chime('DONE', v);
         if (prefs.vibrate) buzz('DONE');
-        if (prefs.voice) speak('That’s your walk complete. Well done.', v);
+        if (prefs.voice && isVisible()) speak('That’s your walk complete. Well done.', v);
         complete(total, true);
         return;
       }
       if (!running || !phase.segment) return;
       const seg = phase.segment;
-      if (prefs.chime) chime(seg.pace, v);
+      if (chimeNow) chime(seg.pace, v);
       if (prefs.vibrate && !first) buzz(seg.pace);
-      if (prefs.voice) speak(`${PHASE_COPY[seg.pace].spoken} ${spokenDuration(seg.seconds)}.`, v);
+      if (prefs.voice && isVisible()) speak(`${PHASE_COPY[seg.pace].spoken} ${spokenDuration(seg.seconds)}.`, v);
     }
     // gentle heads-up 10 seconds before a change
     if (running && phase.next && phase.segment && phase.segment.seconds >= 40 && phase.remainingInSegment <= 10 && phase.remainingInSegment > 8) {
       const key = `${phase.index}`;
       if (headsUp.current !== key) {
         headsUp.current = key;
-        if (prefs.voice) speak(`In ten seconds, ${PHASE_COPY[phase.next.pace].label.toLowerCase()}.`, v);
+        if (prefs.voice && isVisible()) speak(`In ten seconds, ${PHASE_COPY[phase.next.pace].label.toLowerCase()}.`, v);
       }
     }
   }, [phase.index, phase.done, Math.ceil(phase.remainingInSegment), running, started]);
 
+  // ---- locked-screen audio: schedule all remaining chimes on the audio clock ----
+  useEffect(() => {
+    if (!bgAudio) return;
+    if (running && !phase.done) {
+      scheduleCues(segments, elapsedMs(clock) / 1000, { chime: prefs.chime, volume: prefs.volume, headsUp: prefs.chime });
+    } else {
+      cancelScheduled();
+    }
+  }, [running, clock.startedAt, clock.pausedTotal, prefs.chime, prefs.volume]);
+
+  // ---- lock-screen card with play/pause ----
+  useEffect(() => {
+    if (!started || phase.done || !phase.segment) return;
+    setLockScreen(PHASE_COPY[phase.segment.pace].label, name, { play: onResume, pause }, running);
+  }, [started, running, phase.index, phase.done]);
+
+  useEffect(() => () => { cancelScheduled(); stopKeepAlive(); clearLockScreen(); }, []);
+
   const complete = async (seconds: number, isComplete: boolean) => {
     await saveActiveWalk(null);
     wake.current?.disable();
+    // let the final chime finish, then release the media session
+    setTimeout(() => { cancelScheduled(); stopKeepAlive(); clearLockScreen(); }, isComplete ? 2500 : 0);
     const secs = Math.round(seconds);
     setFinished({ seconds: secs, complete: isComplete, saved: 'saving' });
     if (secs < 60) return setFinished({ seconds: secs, complete: isComplete, saved: 'failed' });
@@ -144,8 +171,9 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
     }
   };
 
-  const onStart = () => { unlockAudio(); start(); };
-  const onResume = () => { unlockAudio(); resume(); };
+  // startKeepAlive must run inside the tap itself for phones to allow it
+  const onStart = () => { unlockAudio(); startKeepAlive(); start(); };
+  const onResume = () => { unlockAudio(); startKeepAlive(); resume(); };
   const onFinish = () => { setConfirmFinish(false); complete(elapsedMs(clock) / 1000, false); };
 
   if (finished) return <Finished {...finished} name={name} segments={segments} />;
@@ -255,7 +283,7 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
 
         <Text style={[type.small, { color: C.sub, marginTop: 20, textAlign: 'center' }]}>
           {Platform.OS === 'web'
-            ? 'Time stays accurate if you lock your phone or switch apps, but sounds and voice may wait until you come back. Please stay aware of your surroundings.'
+            ? 'You can lock your phone: time stays accurate and chimes keep playing. Spoken announcements play while the screen is on. Please stay aware of your surroundings.'
             : 'Time stays accurate in the background. Please stay aware of your surroundings.'}
         </Text>
       </ScrollView>
@@ -272,7 +300,7 @@ function SettingsPanel({ prefs, setPrefs, caps, wakeHeld, running, C }: any) {
     <Card style={{ marginTop: 8, gap: 2, backgroundColor: C.card, borderColor: C.line }}>
       <BaseToggle palette={pal} label="Spoken announcements" value={prefs.voice && caps.speech} onChange={v => setPrefs({ voice: v })}
         note={caps.speech ? 'Plays over music briefly; it won’t stop your music.' : 'Not available in this browser.'} />
-      <BaseToggle palette={pal} label="Chimes" value={prefs.chime} onChange={v => setPrefs({ chime: v })} note="Rising for brisk, falling for easy." />
+      <BaseToggle palette={pal} label="Chimes" value={prefs.chime} onChange={v => setPrefs({ chime: v })} note="Rising for brisk, falling for easy, with a soft tick 10 seconds before. Keeps playing with your phone locked." />
       <BaseToggle palette={pal} label="Vibration" value={prefs.vibrate} onChange={v => setPrefs({ vibrate: v })}
         note={caps.vibrate ? undefined : 'Not supported here (iPhone browsers don’t allow it).'} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56 }}>
