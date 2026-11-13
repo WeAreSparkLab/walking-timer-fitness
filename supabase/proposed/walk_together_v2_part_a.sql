@@ -1,5 +1,5 @@
--- PROPOSED — NOT APPLIED. Review before running on Supabase.
--- Walk Together v2: authoritative shared timeline + invitation security.
+-- PART A — ADDITIVE ONLY. Safe to run while the current app is live.
+-- Walk Together v2: shared timeline, readiness, expiring invitations, host controls.
 -- Additive only: no columns or tables are dropped, so the current live app
 -- keeps working while the new one rolls out.
 
@@ -105,25 +105,6 @@ begin
   returning token into t;
   return t;
 end $$;
-
--- 7. Tighten row-level security -------------------------------------------
--- Walks, their walkers and invitation tokens are visible only to members.
-drop policy if exists sessions_select on public.sessions;
-create policy sessions_select on public.sessions for select to authenticated
-  using (host_id = (select auth.uid()) or walking_private.is_session_member(id));
-
-drop policy if exists participants_select on public.session_participants;
-create policy participants_select on public.session_participants for select to authenticated
-  using (walking_private.is_session_member(session_id));
-
--- Direct inserts only for the host adding themselves; everyone else joins via redeem_invite().
-drop policy if exists participants_insert on public.session_participants;
-create policy participants_insert on public.session_participants for insert to authenticated
-  with check (user_id = (select auth.uid()) and walking_private.is_session_host(session_id));
-
-drop policy if exists invites_select on public.session_invites;
-create policy invites_select on public.session_invites for select to authenticated
-  using (walking_private.is_session_host(session_id));
 
 grant execute on function public.server_now(), public.start_walk(uuid, int), public.pause_walk(uuid),
   public.resume_walk(uuid), public.preview_invite(text), public.redeem_invite(text), public.rotate_invite(uuid)
