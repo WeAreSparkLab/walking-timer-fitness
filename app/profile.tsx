@@ -210,7 +210,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
+      <LinearGradient colors={['rgba(242,166,90,0.2)', 'rgba(156,197,161,0.08)']} style={styles.bgGlow} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.iconBtn}>
           <Text style={styles.backIcon}>←</Text>
@@ -251,7 +251,7 @@ export default function ProfileScreen() {
             />
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity onPress={doSignIn} disabled={authBusy} style={[styles.flex1, { overflow: 'hidden', borderRadius: radius.md }]}>
-                <LinearGradient colors={[colors.accent, colors.accent2]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.ctaBtn}>
+                <LinearGradient colors={[colors.accent, '#8E4214']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.ctaBtn}>
                   <Text style={styles.ctaBtnText}>{authBusy ? '…' : 'Sign in'}</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -305,7 +305,7 @@ export default function ProfileScreen() {
       </View>
 
       <TouchableOpacity onPress={onSave} activeOpacity={0.9} disabled={saving} style={{ marginTop: 10 }}>
-        <LinearGradient colors={[colors.accent, colors.accent2]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.saveBtn}>
+        <LinearGradient colors={[colors.accent, '#8E4214']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.saveBtn}>
           <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save'}</Text>
         </LinearGradient>
       </TouchableOpacity>
@@ -316,7 +316,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: pad.lg },
-  bgGlow: { position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
+  bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
   header: { paddingTop: 56, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
   backButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },

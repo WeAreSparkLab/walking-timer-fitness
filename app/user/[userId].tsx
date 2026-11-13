@@ -301,7 +301,7 @@ export default function UserProfilePage() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['rgba(138,43,226,0.25)', 'rgba(0,234,255,0.10)']} style={styles.bgGlow} />
+      <LinearGradient colors={['rgba(242,166,90,0.25)', 'rgba(156,197,161,0.10)']} style={styles.bgGlow} />
       
       {/* Header */}
       <View style={styles.header}>
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bgGlow: {
+  bgGlow: { opacity: 0.3, 
     position: 'absolute',
     width: '120%',
     height: '120%',

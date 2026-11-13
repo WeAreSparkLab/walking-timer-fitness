@@ -321,7 +321,7 @@ export default function StartGroupWalk() {
   if (inviteLink && sessionId && !editId) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
+        <LinearGradient colors={['rgba(242,166,90,0.2)', 'rgba(156,197,161,0.08)']} style={styles.bgGlow} />
         
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.replace('/dashboard')} style={styles.iconBtn}>
@@ -359,7 +359,7 @@ export default function StartGroupWalk() {
 
           <TouchableOpacity onPress={handleStartWalk} activeOpacity={0.9} style={styles.startBtnWrapper}>
             <LinearGradient 
-              colors={[colors.accent, colors.accent2]} 
+              colors={[colors.accent, '#8E4214']} 
               start={{ x: 0, y: 0.5 }} 
               end={{ x: 1, y: 0.5 }} 
               style={styles.startBtn}
@@ -485,7 +485,7 @@ export default function StartGroupWalk() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
+      <LinearGradient colors={['rgba(242,166,90,0.2)', 'rgba(156,197,161,0.08)']} style={styles.bgGlow} />
       
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.replace('/dashboard')} style={styles.iconBtn}>
@@ -544,7 +544,7 @@ export default function StartGroupWalk() {
           style={styles.createBtnWrapper}
         >
           <LinearGradient 
-            colors={[colors.accent, colors.accent2]} 
+            colors={[colors.accent, '#8E4214']} 
             start={{ x: 0, y: 0.5 }} 
             end={{ x: 1, y: 0.5 }} 
             style={styles.createBtn}
@@ -559,7 +559,7 @@ export default function StartGroupWalk() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  bgGlow: { position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
+  bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
   header: { 
     paddingTop: 56, 
     paddingHorizontal: pad.lg, 
@@ -624,7 +624,7 @@ const styles = StyleSheet.create({
 
   planCardSelected: {
     borderColor: colors.accent,
-    backgroundColor: 'rgba(138,43,226,0.08)',
+    backgroundColor: 'rgba(242,166,90,0.08)',
   },
 
   planCardContent: {

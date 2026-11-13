@@ -100,7 +100,7 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['rgba(138,43,226,0.25)', 'rgba(0,234,255,0.10)']}
+        colors={['rgba(242,166,90,0.25)', 'rgba(156,197,161,0.10)']}
         style={styles.bgGlow}
         start={{ x: 0.1, y: 0.1 }}
         end={{ x: 0.9, y: 0.9 }}
@@ -144,7 +144,7 @@ export default function LoginScreen() {
           disabled={loading}
         >
           <LinearGradient
-            colors={[colors.accent, colors.accent2]}
+            colors={[colors.accent, '#8E4214']}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
             style={[styles.cta, loading && { opacity: 0.6 }]}
@@ -178,7 +178,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: pad.lg },
-  bgGlow: { position: 'absolute', width: '120%', height: '120%', borderRadius: 999 },
+  bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999 },
   card: {
     width: '100%', maxWidth: 480, backgroundColor: colors.card, borderRadius: radius.lg, padding: pad.xl,
     borderWidth: 1, borderColor: colors.line,
