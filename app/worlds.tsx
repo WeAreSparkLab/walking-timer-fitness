@@ -4,6 +4,7 @@ import { View, Text, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Scenery from '../components/spark/Scenery';
+import Scenery3D from '../components/spark/Scenery3D';
 import { WORLDS } from '../lib/spark/worlds';
 import { usePrefs, prefersReducedMotion } from '../lib/spark/prefs';
 import { ink, round, space } from '../lib/spark/tokens';
@@ -25,7 +26,7 @@ export default function Worlds() {
         return (
           <Pressable key={w.id} onPress={() => setPrefs({ world: w.id })} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`${w.name}. ${w.line}`}
             style={{ borderRadius: round.lg, overflow: 'hidden', borderWidth: 2, borderColor: on ? ink.ember : ink.line }}>
-            <View style={{ height: 260 }}><Scenery world={w} still={still} /></View>
+            <View style={{ height: on ? 380 : 200 }}>{on && !prefs.lowPower ? <Scenery3D world={w} still={still} enabled={prefs.scene3d} /> : <Scenery world={w} still />}</View>
             <View style={{ padding: space.md, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: ink.cardSolid }}>
               <View style={{ flex: 1 }}>
                 <Text style={type.title}>{w.name}</Text>
@@ -37,6 +38,7 @@ export default function Worlds() {
         );
       })}
       <Toggle label="Simple mode (no scenery)" value={prefs.world === 'simple'} onChange={v => setPrefs({ world: v ? 'simple' : 'woodland' })} />
+      <Toggle label="3D scenery" value={prefs.scene3d} onChange={v => setPrefs({ scene3d: v })} note="Switch off for the lighter 2D artwork." />
       <Toggle label="Low-power mode" value={prefs.lowPower} onChange={v => setPrefs({ lowPower: v })} note="Turns off scenery and animation to save battery." />
       <Button label="Done" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
     </ScrollView>

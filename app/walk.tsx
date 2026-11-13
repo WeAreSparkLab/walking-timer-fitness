@@ -9,6 +9,7 @@ import { usePrefs } from '../lib/spark/prefs';
 import { getWorld } from '../lib/spark/worlds';
 import { Button, Card, PhaseIcon, Timeline, Toggle as BaseToggle, LIGHT_TOGGLE, type, useSparkFonts } from '../components/spark/ui';
 import Scenery from '../components/spark/Scenery';
+import Scenery3D from '../components/spark/Scenery3D';
 import { PRESETS, PHASE_COPY, Segment, buildSegments, fmtClock, fmtMinutes, segmentsFromIntervals, totalSeconds } from '../lib/walk/schedule';
 import { useWalkClock, loadActiveWalk, saveActiveWalk, elapsedMs, ClockState } from '../lib/walk/engine';
 import { buzz, capabilities, chime, createWakeLock, speak, unlockAudio } from '../lib/walk/cues';
@@ -287,7 +288,7 @@ function Finished({ seconds, complete, saved, name, segments }: { seconds: numbe
   return (
     <View style={{ flex: 1, backgroundColor: ink.bg }}>
       <View style={{ height: 300 }}>
-        {!prefs.lowPower ? <Scenery world={world} fadeTo={ink.bg} focus="horizon" /> : null}
+        {!prefs.lowPower ? <Scenery3D world={world} fadeTo={ink.bg} enabled={prefs.scene3d} /> : null}
       </View>
       <View style={{ padding: space.lg, marginTop: -60, gap: 14, maxWidth: 560, width: '100%', alignSelf: 'center' }}>
         <Text accessibilityRole="header" style={type.display}>{complete ? 'Lovely walk.' : 'Nicely done.'}</Text>

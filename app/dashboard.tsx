@@ -16,6 +16,7 @@ import { WORLDS, SIMPLE_WORLD, getWorld } from '../lib/spark/worlds';
 import { ink, round, space } from '../lib/spark/tokens';
 import { Button, Card, Timeline, Toggle, type, useSparkFonts } from '../components/spark/ui';
 import Scenery from '../components/spark/Scenery';
+import Scenery3D from '../components/spark/Scenery3D';
 
 type GroupWalk = { id: string; name: string | null; status: string; host_id: string; created_at: string; count: number };
 type Invite = { id: string; data: { session_id?: string; session_name?: string; host_name?: string } };
@@ -110,7 +111,7 @@ export default function Dashboard() {
     <ScrollView style={{ flex: 1, backgroundColor: ink.bg }} contentContainerStyle={{ paddingBottom: 64 }}>
       {/* Hero world */}
       <View style={{ height: 420, justifyContent: 'flex-end' }}>
-        {!prefs.lowPower ? <Scenery world={world} still={still} fadeTo={ink.bg} /> : null}
+        {!prefs.lowPower ? <Scenery3D world={world} still={still} fadeTo={ink.bg} enabled={prefs.scene3d} /> : null}
         <View style={{ position: 'absolute', top: 44, left: space.md, right: space.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(13,19,16,0.45)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: round.pill }}>
             <Ionicons name="sparkles" size={16} color={ink.ember} />
@@ -268,6 +269,7 @@ export default function Dashboard() {
             })}
           </ScrollView>
           <Text style={[type.small, { color: ink.faint }]}>Worlds are scenery for the app, not maps of where you are.</Text>
+          <Toggle label="3D scenery" value={prefs.scene3d} onChange={v => setPrefs({ scene3d: v })} note="Switch off for the lighter 2D artwork." />
           <Toggle label="Low-power mode" value={prefs.lowPower} onChange={v => setPrefs({ lowPower: v })} note="Turns off scenery and animation to save battery." />
         </Section>
 
