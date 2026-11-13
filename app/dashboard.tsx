@@ -49,7 +49,13 @@ export default function Dashboard() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) router.replace('/');
-      else { setUserId(session.user.id); setAuthChecked(true); }
+      else {
+        setUserId(session.user.id); setAuthChecked(true);
+        // Request notification permission and register FCM token on web
+        if (Platform.OS === 'web') {
+          import('../lib/fcmHelper').then(({ subscribeFCM }) => subscribeFCM(session.user.id).catch(() => {})).catch(() => {});
+        }
+      }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!session) router.replace('/');

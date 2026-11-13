@@ -55,7 +55,7 @@ export async function subscribeToWebPush(): Promise<void> {
     const registration = await navigator.serviceWorker.ready;
 
     // VAPID key - must match the one in Supabase Edge Function secrets
-    const vapidPublicKey = 'BPREOpNMvhTuXhI_3s9JWM2cEwNSz2we9oPMYiq-5I14BCIssmpEG1BHNPsM2CW5sJ3CWv3tV-0VniAi8EOKmQU';
+    const vapidPublicKey = 'BCN91a9__a70maiqJtdpauC5sRnl74cic7Q4PP5K6ro8MMEKMckKsYvOWZrn9BIYfVW9dj6G-WgXwk7m5NBJook';
 
     // Check for existing subscription
     const existingSubscription = await registration.pushManager.getSubscription();
