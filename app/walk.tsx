@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ink, phaseTone, round, space } from '../lib/spark/tokens';
 import { usePrefs } from '../lib/spark/prefs';
 import { getWorld } from '../lib/spark/worlds';
-import { Button, Card, PhaseIcon, Timeline, Toggle, type, useSparkFonts } from '../components/spark/ui';
+import { Button, Card, PhaseIcon, Timeline, Toggle as BaseToggle, LIGHT_TOGGLE, type, useSparkFonts } from '../components/spark/ui';
 import Scenery from '../components/spark/Scenery';
 import { PRESETS, PHASE_COPY, Segment, buildSegments, fmtClock, fmtMinutes, segmentsFromIntervals, totalSeconds } from '../lib/walk/schedule';
 import { useWalkClock, loadActiveWalk, saveActiveWalk, elapsedMs, ClockState } from '../lib/walk/engine';
@@ -256,22 +256,25 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
 
 function SettingsPanel({ prefs, setPrefs, caps, wakeHeld, running, C }: any) {
   const vol = Math.round(prefs.volume * 100);
+  const light = prefs.brightMode;
+  const pal = light ? LIGHT_TOGGLE : undefined;
+  const stepTone = light ? { bg: '#ECE6DA', fg: '#121212' } : undefined;
   return (
     <Card style={{ marginTop: 8, gap: 2, backgroundColor: C.card, borderColor: C.line }}>
-      <Toggle label="Spoken announcements" value={prefs.voice && caps.speech} onChange={v => setPrefs({ voice: v })}
+      <BaseToggle palette={pal} label="Spoken announcements" value={prefs.voice && caps.speech} onChange={v => setPrefs({ voice: v })}
         note={caps.speech ? 'Plays over music briefly; it won’t stop your music.' : 'Not available in this browser.'} />
-      <Toggle label="Chimes" value={prefs.chime} onChange={v => setPrefs({ chime: v })} note="Rising for brisk, falling for easy." />
-      <Toggle label="Vibration" value={prefs.vibrate} onChange={v => setPrefs({ vibrate: v })}
+      <BaseToggle palette={pal} label="Chimes" value={prefs.chime} onChange={v => setPrefs({ chime: v })} note="Rising for brisk, falling for easy." />
+      <BaseToggle palette={pal} label="Vibration" value={prefs.vibrate} onChange={v => setPrefs({ vibrate: v })}
         note={caps.vibrate ? undefined : 'Not supported here (iPhone browsers don’t allow it).'} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56 }}>
         <Text style={[type.label, { flex: 1, color: C.text }]}>Cue volume</Text>
-        <Button label="Quieter" kind="secondary" icon="remove" style={{ minHeight: 48, paddingHorizontal: 12 }} onPress={() => setPrefs({ volume: Math.max(0, +(prefs.volume - 0.1).toFixed(1)) })} />
+        <Button label="Quieter" kind="secondary" icon="remove" tone={stepTone} style={{ minHeight: 48, paddingHorizontal: 12 }} onPress={() => setPrefs({ volume: Math.max(0, +(prefs.volume - 0.1).toFixed(1)) })} />
         <Text accessibilityLiveRegion="polite" style={[type.num, { width: 48, textAlign: 'center', color: C.text, fontSize: 16 }]}>{vol}%</Text>
-        <Button label="Louder" kind="secondary" icon="add" style={{ minHeight: 48, paddingHorizontal: 12 }} onPress={() => setPrefs({ volume: Math.min(1, +(prefs.volume + 0.1).toFixed(1)) })} />
+        <Button label="Louder" kind="secondary" icon="add" tone={stepTone} style={{ minHeight: 48, paddingHorizontal: 12 }} onPress={() => setPrefs({ volume: Math.min(1, +(prefs.volume + 0.1).toFixed(1)) })} />
       </View>
-      <Toggle label="Bright light mode" value={prefs.brightMode} onChange={v => setPrefs({ brightMode: v })} note="Dark text on light for strong sunshine." />
-      <Toggle label="Low-power mode" value={prefs.lowPower} onChange={v => setPrefs({ lowPower: v })} note="Hides scenery and animation everywhere." />
-      <Toggle label="Keep screen on" value={prefs.keepAwake} onChange={v => setPrefs({ keepAwake: v })}
+      <BaseToggle palette={pal} label="Bright light mode" value={prefs.brightMode} onChange={v => setPrefs({ brightMode: v })} note="Dark text on light for strong sunshine." />
+      <BaseToggle palette={pal} label="Low-power mode" value={prefs.lowPower} onChange={v => setPrefs({ lowPower: v })} note="Hides scenery and animation everywhere." />
+      <BaseToggle palette={pal} label="Keep screen on" value={prefs.keepAwake} onChange={v => setPrefs({ keepAwake: v })}
         note={!caps.wakeLock ? 'Not supported in this browser.' : running ? (wakeHeld ? 'Screen is being kept on.' : 'Waiting for permission.') : 'Starts when your walk starts.'} />
     </Card>
   );

@@ -98,18 +98,22 @@ export function Timeline({ segments, progress, light, height = 34 }: { segments:
   );
 }
 
-export function Toggle({ label, value, onChange, note }: { label: string; value: boolean; onChange: (v: boolean) => void; note?: string }) {
+type TogglePalette = { text: string; sub: string; trackOff: string; knobOff: string; trackOn: string; knobOn: string };
+const DARK_TOGGLE: TogglePalette = { text: ink.text, sub: ink.sub, trackOff: 'rgba(246,241,231,0.18)', knobOff: ink.text, trackOn: ink.ember, knobOn: ink.emberInk };
+export const LIGHT_TOGGLE: TogglePalette = { text: '#121212', sub: '#3B3A36', trackOff: '#8C877C', knobOff: '#FFFFFF', trackOn: '#8A4B00', knobOn: '#FFFFFF' };
+
+export function Toggle({ label, value, onChange, note, palette = DARK_TOGGLE }: { label: string; value: boolean; onChange: (v: boolean) => void; note?: string; palette?: TogglePalette }) {
   return (
     <Pressable onPress={() => onChange(!value)} accessibilityRole="switch" accessibilityState={{ checked: value }} accessibilityLabel={label}
       style={{ minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }}>
       <View style={{ flex: 1 }}>
-        <Text style={type.label}>{label}</Text>
-        {note ? <Text style={[type.small, { marginTop: 2 }]}>{note}</Text> : null}
+        <Text style={[type.label, { color: palette.text }]}>{label}</Text>
+        {note ? <Text style={[type.small, { marginTop: 2, color: palette.sub }]}>{note}</Text> : null}
       </View>
-      <View style={{ width: 52, height: 32, borderRadius: 16, padding: 3, backgroundColor: value ? ink.ember : 'rgba(246,241,231,0.18)', alignItems: value ? 'flex-end' : 'flex-start' }}>
-        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: value ? ink.emberInk : ink.text }} />
+      <View style={{ width: 52, height: 32, borderRadius: 16, padding: 3, backgroundColor: value ? palette.trackOn : palette.trackOff, alignItems: value ? 'flex-end' : 'flex-start' }}>
+        <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: value ? palette.knobOn : palette.knobOff }} />
       </View>
-      <Text style={[type.small, { width: 28 }]}>{value ? 'On' : 'Off'}</Text>
+      <Text style={[type.small, { width: 28, color: palette.sub }]}>{value ? 'On' : 'Off'}</Text>
     </Pressable>
   );
 }
