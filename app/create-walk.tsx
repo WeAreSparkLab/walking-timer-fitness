@@ -1,228 +1,242 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+// app/create-walk.tsx — walk creator (redesign).
+// The timeline, total and timer all use lib/walk/schedule.ts, so what you
+// build here is exactly what the timer runs.
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, TextInput, ScrollView, Pressable } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { colors, pad, radius, paceColors } from '../lib/theme';
 import 'react-native-get-random-values';
 import { v4 as uuid } from 'uuid';
 import { savePlan, getPlanById, removePlan, Pace } from '../lib/storage';
+import {
+  PRESETS, PHASE_COPY, Segment, WalkStructure, LIMITS,
+  buildSegments, structureFromSegments, segmentsFromIntervals, intervalsFromSegments,
+  validateStructure, validateSegments, totalSeconds, fmtClock, fmtMinutes,
+} from '../lib/walk/schedule';
+import { ink, phaseTone, round, space } from '../lib/spark/tokens';
+import { Button, Card, PhaseIcon, Timeline, Toggle, type, useSparkFonts } from '../components/spark/ui';
 
-type IntervalItem = { pace: Pace; minutes: number; seconds: number };
+const PACES: Pace[] = ['WARMUP', 'FAST', 'SLOW', 'COOLDOWN'];
+const stepFor = (sec: number) => (sec < 120 ? 15 : 30);
 
 export default function CreateWalk() {
+  useSparkFonts();
   const router = useRouter();
-  const { editId } = useLocalSearchParams<{ editId?: string }>();
-  const [walkId, setWalkId] = useState<string | null>(null);
-  const [walkName, setWalkName] = useState('');
-  const [intervals, setIntervals] = useState<IntervalItem[]>([
-    { pace: 'WARMUP', minutes: 3, seconds: 0 },
-    { pace: 'FAST', minutes: 5, seconds: 0 },
-    { pace: 'SLOW', minutes: 3, seconds: 0 },
-    { pace: 'COOLDOWN', minutes: 3, seconds: 0 },
-  ]);
+  const { editId, preset } = useLocalSearchParams<{ editId?: string; preset?: string }>();
+  const [loaded, setLoaded] = useState(!editId);
+  const [planId, setPlanId] = useState<string | null>(null);
+  const [createdAt, setCreatedAt] = useState<number>(Date.now());
+  const [name, setName] = useState('');
+  const [favourite, setFavourite] = useState(true);
+  const [presetId, setPresetId] = useState<string>('classic');
+  const [mode, setMode] = useState<'structure' | 'parts'>('structure');
+  const [structure, setStructure] = useState<WalkStructure>(PRESETS[2].structure);
+  const [parts, setParts] = useState<Segment[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  // Load existing plan if editing
   useEffect(() => {
-    if (editId) {
-      (async () => {
-        const plan = await getPlanById(editId);
-        if (plan) {
-          setWalkId(plan.id);
-          setWalkName(plan.name);
-          setIntervals(plan.intervals);
+    (async () => {
+      if (editId) {
+        const p = await getPlanById(String(editId));
+        if (p) {
+          setPlanId(p.id); setName(p.name); setCreatedAt(p.createdAt); setFavourite(!!p.favourite);
+          const segs = segmentsFromIntervals(p.intervals);
+          const s = structureFromSegments(segs);
+          setPresetId('custom');
+          if (s) { setStructure(s); setMode('structure'); } else { setParts(segs); setMode('parts'); }
         }
-      })();
-    }
-  }, [editId]);
+        setLoaded(true);
+        return;
+      }
+      const pr = PRESETS.find(p => p.id === preset);
+      if (pr) { setPresetId(pr.id); setStructure(pr.structure); }
+    })();
+  }, [editId, preset]);
 
-  const addInterval = () => setIntervals(prev => [...prev, { pace: 'SLOW', minutes: 3, seconds: 0 }]);
-  const removeInterval = (idx: number) => setIntervals(prev => prev.filter((_, i) => i !== idx));
-  const update = (idx: number, patch: Partial<IntervalItem>) =>
-    setIntervals(prev => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  const segments = useMemo(() => (mode === 'structure' ? buildSegments(structure) : parts), [mode, structure, parts]);
+  const problem = mode === 'structure' ? validateStructure(structure) : validateSegments(parts);
+  const total = totalSeconds(segments);
 
-  const saveWalk = async () => {
-    const cleaned = intervals
-      .map(iv => ({
-        pace: iv.pace,
-        minutes: Math.max(0, iv.minutes | 0),
-        seconds: Math.max(0, Math.min(59, iv.seconds | 0)),
-      }))
-      .filter(iv => iv.minutes > 0 || iv.seconds > 0);
+  const pickPreset = (id: string) => {
+    setPresetId(id);
+    setError(null);
+    const pr = PRESETS.find(p => p.id === id);
+    if (pr) { setMode('structure'); setStructure(pr.structure); }
+  };
+  const setPart = (patch: Partial<WalkStructure>) => { setPresetId('custom'); setStructure(s => ({ ...s, ...patch })); };
+  const toParts = () => { setParts(buildSegments(structure)); setMode('parts'); setPresetId('custom'); };
 
-    if (!walkName.trim()) {
-      Alert.alert('Name Required', 'Please enter a name for this walk');
-      return;
-    }
-    if (cleaned.length === 0) {
-      Alert.alert('No Intervals', 'Please add at least one interval with time > 0');
-      return;
-    }
-
-    await savePlan({
-      id: walkId || uuid(),
-      name: walkName,
-      intervals: cleaned,
-      createdAt: Date.now(),
-    });
-    router.push('/dashboard');
+  const save = async (startAfter: boolean) => {
+    const msg = problem ?? (!name.trim() ? 'Give your walk a name so you can find it again.' : null);
+    if (msg) return setError(msg);
+    setSaving(true);
+    const id = planId ?? uuid();
+    await savePlan({ id, name: name.trim(), intervals: intervalsFromSegments(segments), createdAt, favourite });
+    if (startAfter) router.replace({ pathname: '/walk', params: { planId: id } });
+    else router.replace('/dashboard');
   };
 
-  const handleDeleteWalk = async () => {
-    if (!editId) return;
-    
-    Alert.alert(
-      'Delete Walk',
-      'Are you sure you want to delete this walk?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive', 
-          onPress: async () => {
-            await removePlan(editId);
-            router.replace('/dashboard');
-          }
-        },
-      ]
-    );
+  const del = async () => {
+    if (!planId) return;
+    await removePlan(planId);
+    router.replace('/dashboard');
   };
+
+  if (!loaded) return <View style={{ flex: 1, backgroundColor: ink.bg }} />;
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['rgba(242,166,90,0.2)', 'rgba(156,197,161,0.08)']} style={styles.bgGlow} />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.iconBtn}>
-          <Text style={styles.iconText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{editId ? 'Edit Walk' : 'Create Walk'}</Text>
-        {editId && (
-          <TouchableOpacity onPress={handleDeleteWalk} style={styles.iconBtn}>
-            <Ionicons name="trash-outline" size={24} color={colors.danger} />
-          </TouchableOpacity>
-        )}
-        {!editId && <View style={{ width: 36 }} />}
+    <View style={{ flex: 1, backgroundColor: ink.bg }}>
+      <View style={{ paddingTop: 48, paddingHorizontal: space.md, flexDirection: 'row', alignItems: 'center' }}>
+        <Pressable onPress={() => router.replace('/dashboard')} accessibilityRole="button" accessibilityLabel="Back to home without saving"
+          style={{ minWidth: 48, minHeight: 48, justifyContent: 'center' }}>
+          <Ionicons name="chevron-back" size={28} color={ink.text} />
+        </Pressable>
+        <Text accessibilityRole="header" style={[type.label, { flex: 1, textAlign: 'center' }]}>{planId ? 'Edit walk' : 'Create a walk'}</Text>
+        <View style={{ width: 48 }} />
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: pad.lg }}>
-
-        <View style={styles.block}>
-          <Text style={styles.label}>Walk name</Text>
-          <TextInput
-            value={walkName}
-            onChangeText={setWalkName}
-            placeholder="e.g. 30-min Intervals"
-            placeholderTextColor={colors.sub}
-            style={styles.input}
-          />
+      <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: 220, gap: space.lg, maxWidth: 600, width: '100%', alignSelf: 'center' }}>
+        {/* Name */}
+        <View style={{ gap: 8 }}>
+          <Text nativeID="nameLabel" style={type.label}>Name</Text>
+          <TextInput value={name} onChangeText={t => { setName(t); setError(null); }} accessibilityLabelledBy="nameLabel"
+            placeholder="e.g. Lunchtime loop" placeholderTextColor={ink.faint} maxLength={60}
+            style={{ minHeight: 54, borderRadius: round.sm, borderWidth: 1, borderColor: ink.line, color: ink.text, paddingHorizontal: 14, fontSize: 17, backgroundColor: 'rgba(0,0,0,0.2)' }} />
         </View>
 
-        <Text style={styles.sectionTitle}>Intervals</Text>
-        {intervals.map((iv, idx) => (
-          <View key={idx} style={styles.rowCard}>
-            <View style={styles.chipsRow}>
-              {(['WARMUP', 'FAST', 'SLOW', 'COOLDOWN'] as Pace[]).map(p => {
-                const active = iv.pace === p;
-                const pc = paceColors[p];
-                return (
-                  <TouchableOpacity
-                    key={p}
-                    style={[
-                      styles.chip,
-                      active && { borderColor: pc.border, backgroundColor: pc.bg }
-                    ]}
-                    onPress={() => update(idx, { pace: p })}
-                  >
-                    <Text style={[styles.chipText, active && { color: pc.fg }]}>{p}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View style={styles.timeRow}>
-              <View style={styles.timeCol}>
-                <Text style={styles.labelSm}>Min</Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  value={String(iv.minutes)}
-                  onChangeText={(t) => update(idx, { minutes: parseInt(t || '0') })}
-                  style={styles.inputSm}
-                />
-              </View>
-              <View style={styles.timeCol}>
-                <Text style={styles.labelSm}>Sec</Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  value={String(iv.seconds)}
-                  onChangeText={(t) => update(idx, { seconds: parseInt(t || '0') })}
-                  style={styles.inputSm}
-                />
-              </View>
-
-              <TouchableOpacity onPress={() => removeInterval(idx)} style={styles.trashBtn}>
-                <Text style={[styles.iconText, { color: colors.danger, fontSize: 18 }]}>🗑</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Presets */}
+        <View style={{ gap: 10 }}>
+          <Text style={type.label}>Start from</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {[...PRESETS.map(p => ({ id: p.id, name: p.name })), { id: 'custom', name: 'Custom walk' }].map(p => {
+              const on = presetId === p.id;
+              return (
+                <Pressable key={p.id} onPress={() => pickPreset(p.id)} accessibilityRole="radio" accessibilityState={{ checked: on }}
+                  style={{ minHeight: 48, paddingHorizontal: 16, borderRadius: round.pill, borderWidth: 1.5, borderColor: on ? ink.ember : ink.line, backgroundColor: on ? 'rgba(242,166,90,0.14)' : 'transparent', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {on ? <Ionicons name="checkmark" size={16} color={ink.ember} /> : null}
+                  <Text style={[type.label, { fontSize: 15 }]}>{p.name}</Text>
+                </Pressable>
+              );
+            })}
           </View>
-        ))}
+          <Text style={[type.small, { color: ink.faint }]}>Ready-made walks are examples, not medical advice. Adjust anything to suit you.</Text>
+        </View>
 
-        <TouchableOpacity onPress={addInterval} style={styles.addBtn} activeOpacity={0.85}>
-          <Ionicons name="add" size={18} color={colors.accent} />
-          <Text style={styles.addText}>Add Interval</Text>
-        </TouchableOpacity>
+        {/* Builder */}
+        {mode === 'structure' ? (
+          <Card style={{ gap: 4 }}>
+            <Stepper pace="WARMUP" label="Warm up" seconds={structure.warmup} min={0} onChange={v => setPart({ warmup: v })} />
+            <Stepper pace="FAST" label="Brisk (pick up the pace)" seconds={structure.fast} min={0} onChange={v => setPart({ fast: v })} />
+            <Stepper pace="SLOW" label="Easy (ease back)" seconds={structure.slow} min={0} onChange={v => setPart({ slow: v })} />
+            <CountStepper value={structure.repeats} onChange={v => setPart({ repeats: v })} />
+            <Stepper pace="COOLDOWN" label="Cool down" seconds={structure.cooldown} min={0} onChange={v => setPart({ cooldown: v })} />
+            <Button label="Fine-tune each part" icon="list-outline" kind="quiet" onPress={toParts} style={{ marginTop: 4 }} />
+          </Card>
+        ) : (
+          <Card style={{ gap: 12 }}>
+            <Text style={type.label}>Parts, in order</Text>
+            {parts.map((p, i) => (
+              <View key={i} style={{ gap: 6, paddingBottom: 10, borderBottomWidth: i < parts.length - 1 ? 1 : 0, borderBottomColor: ink.line }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {PACES.map(pc => {
+                    const on = p.pace === pc;
+                    return (
+                      <Pressable key={pc} onPress={() => setParts(ps => ps.map((x, j) => (j === i ? { ...x, pace: pc } : x)))}
+                        accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`Part ${i + 1}: ${PHASE_COPY[pc].short}`}
+                        style={{ minHeight: 44, paddingHorizontal: 12, borderRadius: round.pill, borderWidth: 1.5, borderColor: on ? phaseTone[pc].dark : ink.line, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <PhaseIcon pace={pc} size={16} color={on ? phaseTone[pc].dark : ink.faint} />
+                        <Text style={[type.small, { color: on ? ink.text : ink.sub, fontWeight: '600' }]}>{PHASE_COPY[pc].short}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ flex: 1 }}>
+                    <Stepper pace={p.pace} label={`Part ${i + 1}`} seconds={p.seconds} min={5} hideIcon
+                      onChange={v => setParts(ps => ps.map((x, j) => (j === i ? { ...x, seconds: v } : x)))} />
+                  </View>
+                  <Pressable onPress={() => setParts(ps => ps.filter((_, j) => j !== i))} accessibilityRole="button" accessibilityLabel={`Remove part ${i + 1}`}
+                    style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="trash-outline" size={20} color={ink.danger} />
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+            <Button label="Add a part" icon="add" kind="secondary"
+              onPress={() => setParts(ps => [...ps, { pace: ps[ps.length - 1]?.pace === 'FAST' ? 'SLOW' : 'FAST', seconds: 120 }])} />
+          </Card>
+        )}
 
-        <TouchableOpacity onPress={saveWalk} activeOpacity={0.9}>
-          <LinearGradient colors={[colors.accent, '#8E4214']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.saveBtn}>
-            <Text style={styles.saveText}>Save Walk</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        <Toggle label="Favourite" value={favourite} onChange={setFavourite} note="Favourites appear first on your home screen." />
 
+        {planId ? (
+          confirmDelete ? (
+            <Card style={{ gap: 10, borderColor: 'rgba(255,138,122,0.5)' }}>
+              <Text style={type.label}>Delete “{name || 'this walk'}”? This can’t be undone.</Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Button label="Keep it" kind="secondary" style={{ flex: 1 }} onPress={() => setConfirmDelete(false)} />
+                <Button label="Delete" kind="danger" style={{ flex: 1 }} onPress={del} />
+              </View>
+            </Card>
+          ) : (
+            <Button label="Delete this walk" icon="trash-outline" kind="danger" onPress={() => setConfirmDelete(true)} />
+          )
+        ) : null}
       </ScrollView>
+
+      {/* Sticky summary: always shows exactly what the timer will run */}
+      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: ink.bg2, borderTopWidth: 1, borderTopColor: ink.line, padding: space.md, paddingBottom: 24 }}>
+        <View style={{ maxWidth: 600, width: '100%', alignSelf: 'center', gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <Text style={type.eyebrow}>Total</Text>
+            <Text accessibilityLiveRegion="polite" style={[type.num, { color: ink.text, fontSize: 22 }]}>
+              {fmtClock(total)} <Text style={type.small}>· {segments.length} parts</Text>
+            </Text>
+          </View>
+          {segments.length ? <Timeline segments={segments} height={26} /> : null}
+          {error || problem ? <Text accessibilityLiveRegion="polite" style={[type.small, { color: error ? ink.danger : ink.sub }]}>{error || problem}</Text> : null}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Button label="Save" kind="secondary" style={{ flex: 1 }} disabled={saving} onPress={() => save(false)} />
+            <Button label="Save and start" icon="play" style={{ flex: 1.6 }} disabled={saving} onPress={() => save(true)} />
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
-  header: { paddingTop: 56, paddingHorizontal: pad.lg, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },
-  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  iconText: { color: colors.text, fontSize: 20 },
+function Stepper({ pace, label, seconds, min, onChange, hideIcon }: { pace: Pace; label: string; seconds: number; min: number; onChange: (v: number) => void; hideIcon?: boolean }) {
+  const dec = () => onChange(Math.max(min, seconds - stepFor(seconds - 1)));
+  const inc = () => onChange(Math.min(LIMITS.maxSegmentSeconds, seconds + stepFor(seconds)));
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 60 }}>
+      {!hideIcon ? <PhaseIcon pace={pace} size={22} /> : null}
+      <Text style={[type.label, { flex: 1, fontSize: 15 }]}>{label}</Text>
+      <StepBtn icon="remove" label={`Less ${label}`} onPress={dec} disabled={seconds <= min} />
+      <Text accessibilityLabel={`${label}: ${fmtMinutes(seconds)}`} style={[type.num, { width: 64, textAlign: 'center', color: seconds ? ink.text : ink.faint, fontSize: 18 }]}>{fmtClock(seconds)}</Text>
+      <StepBtn icon="add" label={`More ${label}`} onPress={inc} disabled={seconds >= LIMITS.maxSegmentSeconds} />
+    </View>
+  );
+}
 
-  block: {
-    backgroundColor: colors.card, borderRadius: radius.lg, padding: pad.md, borderWidth: 1, borderColor: colors.line, marginBottom: 16,
-  },
-  label: { color: colors.sub, marginBottom: 8, fontSize: 12, letterSpacing: 0.3 },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    color: colors.text, borderRadius: radius.md, paddingHorizontal: 14, height: 46,
-  },
+function CountStepper({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 60, paddingLeft: 32 }}>
+      <Text style={[type.label, { flex: 1, fontSize: 15 }]}>Repeat brisk + easy</Text>
+      <StepBtn icon="remove" label="Fewer repeats" onPress={() => onChange(Math.max(0, value - 1))} disabled={value <= 0} />
+      <Text accessibilityLabel={`${value} repeats`} style={[type.num, { width: 64, textAlign: 'center', color: ink.text, fontSize: 18 }]}>× {value}</Text>
+      <StepBtn icon="add" label="More repeats" onPress={() => onChange(Math.min(LIMITS.maxRepeats, value + 1))} disabled={value >= LIMITS.maxRepeats} />
+    </View>
+  );
+}
 
-  sectionTitle: { color: colors.text, fontWeight: '800', marginBottom: 10, marginTop: 6 },
-  rowCard: { backgroundColor: colors.card, borderRadius: radius.lg, padding: pad.md, borderWidth: 1, borderColor: colors.line, marginBottom: 12 },
-  chipsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.03)' },
-  chipActive: { borderColor: colors.accent },
-  chipText: { color: colors.sub, fontWeight: '700', fontSize: 12 },
-  chipTextActive: { color: colors.text },
-
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  timeCol: { flex: 1 },
-  labelSm: { color: colors.sub, fontSize: 12, marginBottom: 6 },
-  inputSm: {
-    backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    color: colors.text, borderRadius: radius.md, paddingHorizontal: 12, height: 42,
-  },
-  trashBtn: { width: 42, height: 42, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-
-  addBtn: {
-    marginTop: 4, marginBottom: 16, borderRadius: radius.md, padding: 12, borderWidth: 1, borderColor: colors.accent,
-    borderStyle: 'dashed', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-  },
-  addText: { color: colors.accent, fontWeight: '700' },
-
-  saveBtn: { borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginBottom: 40 },
-  saveText: { color: colors.text, fontWeight: '800' },
-});
+function StepBtn({ icon, label, onPress, disabled }: { icon: any; label: string; onPress: () => void; disabled?: boolean }) {
+  return (
+    <Pressable onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={label}
+      style={({ pressed }) => ({ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(246,241,231,0.1)', opacity: disabled ? 0.35 : pressed ? 0.7 : 1 })}>
+      <Ionicons name={icon} size={22} color={ink.text} />
+    </Pressable>
+  );
+}
