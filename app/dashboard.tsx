@@ -73,7 +73,8 @@ export default function Dashboard() {
   }
 
   const world = getWorld(prefs.world);
-  const favourite = plans[0];
+  const sortedPlans = [...plans].sort((a, b) => Number(!!b.favourite) - Number(!!a.favourite));
+  const favourite = sortedPlans[0];
   const firstTime = plans.length === 0 && recent !== null && recent.length === 0;
   const primary = favourite
     ? { label: favourite.name, seconds: totalSeconds(segmentsFromIntervals(favourite.intervals)), go: () => router.push({ pathname: '/walk', params: { planId: favourite.id } }) }
@@ -203,9 +204,9 @@ export default function Dashboard() {
 
         {/* Walks */}
         <Section title="Choose a walk" action={{ label: 'Create', icon: 'add', onPress: () => router.push('/create-walk') }}>
-          {plans.map(p => {
+          {sortedPlans.map(p => {
             const segs = segmentsFromIntervals(p.intervals);
-            return <WalkRow key={p.id} name={p.name} sub={`Your plan · ${fmtMinutes(totalSeconds(segs))}`} segs={segs}
+            return <WalkRow key={p.id} name={p.name} sub={`${p.favourite ? '★ Favourite' : 'Your plan'} · ${fmtMinutes(totalSeconds(segs))}`} segs={segs}
               onPress={() => router.push({ pathname: '/walk', params: { planId: p.id } })}
               onEdit={() => router.push({ pathname: '/create-walk', params: { editId: p.id } })} />;
           })}

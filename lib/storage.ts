@@ -9,6 +9,7 @@ export type WalkPlan = {
   name: string;
   intervals: Interval[];
   createdAt: number;
+  favourite?: boolean;   // optional: older saved plans have no flag
 };
 
 const KEY = 'sparkwalk.plans.v1';

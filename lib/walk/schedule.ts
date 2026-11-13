@@ -46,6 +46,30 @@ export function buildSegments(s: WalkStructure): Segment[] {
   return out;
 }
 
+/**
+ * Recognise the standard shape: [warm up] (brisk, easy) × n [cool down].
+ * Returns null for any other sequence (those are edited part by part).
+ */
+export function structureFromSegments(segs: Segment[]): WalkStructure | null {
+  let i = 0;
+  const s: WalkStructure = { warmup: 0, fast: 0, slow: 0, repeats: 0, cooldown: 0 };
+  if (segs[i]?.pace === 'WARMUP') s.warmup = segs[i++].seconds;
+  while (segs[i]?.pace === 'FAST' && segs[i + 1]?.pace === 'SLOW') {
+    if (s.repeats && (segs[i].seconds !== s.fast || segs[i + 1].seconds !== s.slow)) return null;
+    s.fast = segs[i].seconds; s.slow = segs[i + 1].seconds; s.repeats++; i += 2;
+  }
+  if (segs[i]?.pace === 'COOLDOWN') s.cooldown = segs[i++].seconds;
+  if (i !== segs.length || segs.length === 0) return null;
+  return s;
+}
+
+export function validateSegments(segs: Segment[]): string | null {
+  if (!segs.length) return 'Add at least one part to your walk.';
+  if (segs.some(s => !Number.isFinite(s.seconds) || s.seconds <= 0 || s.seconds > LIMITS.maxSegmentSeconds)) return 'Each part needs between 5 seconds and 60 minutes.';
+  if (totalSeconds(segs) > LIMITS.maxTotalSeconds) return 'Walks can be up to 4 hours.';
+  return null;
+}
+
 export function validateStructure(s: WalkStructure): string | null {
   const vals = [s.warmup, s.fast, s.slow, s.cooldown];
   if (vals.some(v => !Number.isFinite(v) || v < 0 || v > LIMITS.maxSegmentSeconds)) return 'Each part can be up to 60 minutes.';
