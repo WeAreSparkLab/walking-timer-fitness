@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Alert, ScrollView, TextInput, Modal, KeyboardAvoidingView, Image } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
@@ -97,7 +97,14 @@ const PACE_STYLES: Record<Pace, { border: string; bg: string }> = {
   COOLDOWN: { border: '#66a6ff', bg: 'rgba(102,166,255,0.15)' },
 };
 
-export default function WalkTimer() {
+// Solo walks now use /walk. Group walks keep this screen until Walk Together v2.
+export default function WalkTimerRoute() {
+  const { planId, sessionId } = useLocalSearchParams<{ planId?: string; sessionId?: string }>();
+  if (!sessionId) return <Redirect href={planId ? { pathname: '/walk', params: { planId: String(planId) } } : '/walk'} />;
+  return <WalkTimer />;
+}
+
+function WalkTimer() {
   const router = useRouter();
   const { planId, sessionId } = useLocalSearchParams<{ planId?: string; sessionId?: string }>();
 
@@ -886,8 +893,8 @@ export default function WalkTimer() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: pad.lg },
-  bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
+  container: { width: '100%', maxWidth: 600, alignSelf: 'center', flex: 1, backgroundColor: colors.bg, paddingHorizontal: pad.lg },
+  bgGlow: { display: 'none',  opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
   scrollContent: { flex: 1 },
   scrollContentContainer: { paddingBottom: 120 },
   header: { paddingTop: 56, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

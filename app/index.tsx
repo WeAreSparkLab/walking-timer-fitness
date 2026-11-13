@@ -178,7 +178,7 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: pad.lg },
-  bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999 },
+  bgGlow: { display: 'none',  opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999 },
   card: {
     width: '100%', maxWidth: 480, backgroundColor: colors.card, borderRadius: radius.lg, padding: pad.xl,
     borderWidth: 1, borderColor: colors.line,
