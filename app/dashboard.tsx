@@ -118,10 +118,16 @@ export default function Dashboard() {
             <Ionicons name="sparkles" size={16} color={ink.ember} />
             <Text style={[type.label, { fontSize: 15 }]}>Spark Walk</Text>
           </View>
-          <Pressable onPress={() => router.push('/profile')} accessibilityRole="button" accessibilityLabel="Your profile and settings"
-            style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden', backgroundColor: 'rgba(13,19,16,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(246,241,231,0.5)' }}>
-            {avatarUrl ? <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44 }} /> : <Ionicons name="person" size={22} color={ink.text} />}
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Pressable onPress={() => router.push('/settings')} accessibilityRole="button" accessibilityLabel="Settings"
+              style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(13,19,16,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(246,241,231,0.5)' }}>
+              <Ionicons name="settings-outline" size={22} color={ink.text} />
+            </Pressable>
+            <Pressable onPress={() => router.push('/profile')} accessibilityRole="button" accessibilityLabel="Your profile"
+              style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden', backgroundColor: 'rgba(13,19,16,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(246,241,231,0.5)' }}>
+              {avatarUrl ? <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44 }} /> : <Ionicons name="person" size={22} color={ink.text} />}
+            </Pressable>
+          </View>
         </View>
         <View style={wrap({ paddingHorizontal: space.md, paddingBottom: 8 })}>
           <Text style={[type.small, { color: ink.text, opacity: 0.85 }]}>{hello}{username ? `, ${username}` : ''}</Text>
@@ -177,6 +183,7 @@ export default function Dashboard() {
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Button label="Friends" icon="heart-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/friends')} />
           <Button label="Profile" icon="person-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/profile')} />
+          <Button label="Settings" icon="settings-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/settings')} />
         </View>
 
         {/* Invitations */}
