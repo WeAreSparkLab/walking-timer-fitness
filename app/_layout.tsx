@@ -5,11 +5,15 @@ import { useEffect } from 'react';
 import { addNotificationResponseListener } from '../lib/notifications';
 import type { NotificationResponse } from 'expo-notifications';
 import InstallPrompt from '../lib/InstallPrompt';
+import { startAnalytics } from '../lib/analytics';
 import { Platform } from 'react-native';
 import { requestNotificationPermission } from '../lib/webNotifications';
 
 export default function RootLayout() {
   const router = useRouter();
+
+  // Cookie-free page views (private IDs redacted, see lib/analytics.ts)
+  useEffect(() => { startAnalytics(); }, []);
 
   // Ensure web push subscription is created after permission is granted (one-time check)
   useEffect(() => {
