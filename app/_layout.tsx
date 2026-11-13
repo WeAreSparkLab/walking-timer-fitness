@@ -7,6 +7,7 @@ import type { NotificationResponse } from 'expo-notifications';
 import InstallPrompt from '../lib/InstallPrompt';
 import { Platform } from 'react-native';
 import { requestNotificationPermission } from '../lib/webNotifications';
+import { supabase } from '../lib/supabaseClient';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -49,12 +50,22 @@ export default function RootLayout() {
   // Register service worker for PWA
   useEffect(() => {
     if (Platform.OS === 'web' && 'serviceWorker' in navigator) {
+      // Register main PWA service worker
       navigator.serviceWorker.register('/sw.js')
         .then((registration) => {
           console.log('Service Worker registered:', registration);
         })
         .catch((error) => {
           console.error('Service Worker registration failed:', error);
+        });
+
+      // Register Firebase Cloud Messaging service worker
+      navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then((registration) => {
+          console.log('FCM Service Worker registered:', registration);
+        })
+        .catch((error) => {
+          console.error('FCM Service Worker registration failed:', error);
         });
     }
   }, []);
@@ -104,6 +115,36 @@ export default function RootLayout() {
         // Silently fail - don't break the app
       });
     }
+  }, []);
+
+  // Subscribe to Firebase Cloud Messaging on web after user is authenticated
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const setupFCM = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { subscribeFCM } = await import('../lib/fcmHelper');
+        await subscribeFCM(user.id);
+      } catch (error) {
+        console.log('FCM setup skipped:', error);
+      }
+    };
+
+    setupFCM();
+
+    // Re-subscribe when auth state changes (e.g. after login)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        import('../lib/fcmHelper')
+          .then(({ subscribeFCM }) => subscribeFCM(session.user.id))
+          .catch(() => {});
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Handle notification taps

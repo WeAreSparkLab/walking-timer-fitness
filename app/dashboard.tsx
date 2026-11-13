@@ -71,6 +71,12 @@ export default function Dashboard() {
         setCurrentUserId(session.user.id);
         // Load data after confirming authentication
         loadInitialData();
+        // Request notification permission and register FCM token on web
+        if (Platform.OS === 'web') {
+          import('../lib/fcmHelper').then(({ subscribeFCM }) => {
+            subscribeFCM(session.user.id).catch(() => {});
+          });
+        }
       }
       setCheckingAuth(false);
     });
