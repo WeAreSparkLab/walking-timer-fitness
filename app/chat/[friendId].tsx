@@ -83,7 +83,7 @@ export default function DirectChat() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
+      <LinearGradient colors={['rgba(242,166,90,0.2)', 'rgba(156,197,161,0.08)']} style={styles.bgGlow} />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/friends')} style={styles.iconBtn}>
@@ -166,7 +166,7 @@ export default function DirectChat() {
             activeOpacity={0.7}
           >
             <LinearGradient
-              colors={[colors.accent, colors.accent2]}
+              colors={[colors.accent, '#8E4214']}
               start={{ x: 0, y: 0.5 }}
               end={{ x: 1, y: 0.5 }}
               style={styles.sendGrad}
@@ -182,7 +182,7 @@ export default function DirectChat() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  bgGlow: { position: 'absolute' as any, top: 0, left: 0, right: 0, height: 400, opacity: 0.3 },
+  bgGlow: { opacity: 0.3,  position: 'absolute' as any, top: 0, left: 0, right: 0, height: 400, opacity: 0.3 },
   
   header: {
     flexDirection: 'row',
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   messageAvatarMe: {
-    backgroundColor: 'rgba(138,43,226,0.3)',
+    backgroundColor: 'rgba(242,166,90,0.3)',
   },
   avatarImage: {
     width: 32,
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   messageBubbleMe: {
-    backgroundColor: 'rgba(138,43,226,0.15)',
+    backgroundColor: 'rgba(242,166,90,0.15)',
     borderColor: colors.accent,
   },
   messageText: {

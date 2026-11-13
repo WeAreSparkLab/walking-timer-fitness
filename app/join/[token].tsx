@@ -56,7 +56,7 @@ export default function JoinByToken() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
+      <LinearGradient colors={['rgba(242,166,90,0.2)', 'rgba(156,197,161,0.08)']} style={styles.bgGlow} />
       <View style={styles.content}>
         {loading ? (
           <>
@@ -82,7 +82,7 @@ export default function JoinByToken() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  bgGlow: { position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
+  bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
   content: { 
     flex: 1, 
     alignItems: 'center', 

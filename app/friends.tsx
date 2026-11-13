@@ -160,7 +160,7 @@ export default function Friends() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
+      <LinearGradient colors={['rgba(242,166,90,0.2)', 'rgba(156,197,161,0.08)']} style={styles.bgGlow} />
       
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.iconBtn}>
@@ -390,7 +390,7 @@ export default function Friends() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  bgGlow: { position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
+  bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
   header: { 
     paddingTop: 56, 
     paddingHorizontal: pad.lg, 
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tabActive: {
-    backgroundColor: 'rgba(138,43,226,0.15)',
+    backgroundColor: 'rgba(242,166,90,0.15)',
     borderColor: colors.accent,
   },
   tabText: {
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.md,
-    backgroundColor: 'rgba(138,43,226,0.15)',
+    backgroundColor: 'rgba(242,166,90,0.15)',
     borderWidth: 1,
     borderColor: colors.accent,
   },
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 999,
-    backgroundColor: 'rgba(138,43,226,0.2)',
+    backgroundColor: 'rgba(242,166,90,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,

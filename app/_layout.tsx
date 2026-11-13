@@ -34,7 +34,7 @@ export default function RootLayout() {
       // Add theme color
       const themeColor = document.createElement('meta');
       themeColor.name = 'theme-color';
-      themeColor.content = '#8A2BE2';
+      themeColor.content = '#B4561C';
       document.head.appendChild(themeColor);
       
       // Add apple touch icon
