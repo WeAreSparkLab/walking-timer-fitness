@@ -39,6 +39,22 @@ export const WORLDS: World[] = [
   },
 ];
 
+export const SEASONAL_WORLDS: World[] = [
+  {
+    id: 'autumn', name: 'Autumn Lane', line: 'Golden leaves and low sun',
+    sky: ['#4B5878', '#C9A27E', '#F3C98D'],
+    sun: { x: 0.3, y: 0.42, r: 24, color: '#FFE0AE', glow: 'rgba(255,190,120,0.55)' },
+    haze: '#D9B48A', layers: ['#A8875E', '#B5652F', '#8E4A25', '#5E3A22', '#2E2116'], accent: '#E9925A',
+  },
+  {
+    id: 'winter', name: 'Winter Hills', line: 'Fresh snow and quiet air',
+    sky: ['#53688F', '#B9C6DA', '#EEF1F5'],
+    sun: { x: 0.68, y: 0.44, r: 20, color: '#FFF6E8', glow: 'rgba(255,245,230,0.5)' },
+    haze: '#DCE3EC', layers: ['#B4C0D2', '#94A6BC', '#E6ECF3', '#C9D4E1', '#F4F7FA'], accent: '#A9C8F0',
+  },
+];
+WORLDS.push(...SEASONAL_WORLDS);
+
 export const SIMPLE_WORLD: World = {
   id: 'simple', name: 'Simple', line: 'Calm colour, no scenery',
   sky: ['#0D1310', '#141C17', '#1C2620'], sun: { x: 0.5, y: 0.5, r: 0, color: 'transparent', glow: 'transparent' },

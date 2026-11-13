@@ -28,6 +28,7 @@ type Cfg = {
   open?: number; // metres of open meadow either side of the path
   peaks?: 'alpine' | 'hills';
   motes?: string;
+  fall?: boolean; // motes fall like leaves or snow instead of drifting
 };
 
 const CFG: Record<string, Cfg> = {
@@ -51,6 +52,21 @@ const CFG: Record<string, Cfg> = {
     conifers: 240, broadleaf: 20, bushes: 90, flowers: 420, open: 17,
     leaf: ['#2d5637', '#3a6a40', '#4d7a45'], bush: ['#4b7040', '#62854a'], bloom: ['#ffffff', '#c9b6f2', '#ffe08a'],
     peaks: 'alpine',
+  },
+  autumn: {
+    amp: 6, ground: ['#6b5a2e', '#9a8a45'], path: '#b8925f',
+    sky: ['#55709a', '#d9b48f', '#f6cf98'], sun: [-0.6, 0.22, -1], sunColor: '#ffc887', fog: [10, 135],
+    conifers: 90, broadleaf: 620, bushes: 240, flowers: 700,
+    leaf: ['#d9822b', '#c4561f', '#e8b23a', '#a8401c', '#e0a040', '#7e8a3a'], bush: ['#a8642a', '#8a6a2e', '#c27a30'],
+    bloom: ['#d9822b', '#c4561f', '#e8b23a', '#8e3a18'],
+    peaks: 'hills', motes: '#ffb45e', fall: true,
+  },
+  winter: {
+    amp: 7, ground: ['#d9e1ea', '#f7f9fb'], path: '#c9d2dc',
+    sky: ['#5f7aa6', '#c4d0e2', '#eef2f7'], sun: [0.55, 0.2, -1], sunColor: '#fff3e0', fog: [10, 170],
+    conifers: 560, broadleaf: 60, bushes: 140, flowers: 0,
+    leaf: ['#1f3b33', '#27463b', '#30503f'], bush: ['#e9eef4', '#dbe3ec'], bloom: ['#ffffff'],
+    peaks: 'alpine', motes: '#ffffff', fall: true, open: 7,
   },
   garden: {
     amp: 2.6, ground: ['#5c8e53', '#8db06c'], path: '#e6d8bb',
@@ -342,11 +358,17 @@ export function createWorld(container: HTMLElement, world: World, opts: Opts = {
   // ---- drifting motes (pollen / petals) ----
   let motes: THREE.Points | null = null; let moteSeed: Float32Array | null = null;
   if (cfg.motes && !opts.still) {
-    const n = 260; moteSeed = new Float32Array(n * 4);
+    const n = cfg.fall ? 700 : 260; moteSeed = new Float32Array(n * 4);
     for (let i = 0; i < n; i++) { moteSeed[i * 4] = (r() - 0.5) * 26; moteSeed[i * 4 + 1] = 0.4 + r() * 5.5; moteSeed[i * 4 + 2] = r() * 34; moteSeed[i * 4 + 3] = r() * TAU; }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-    motes = new THREE.Points(g, new THREE.PointsMaterial({ color: cfg.motes, size: 0.07, transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+    const S = 32, dot = new Uint8Array(S * S * 4);
+    for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
+      const d = Math.hypot(i - S / 2 + 0.5, j - S / 2 + 0.5) / (S / 2);
+      const k = (j * S + i) * 4; dot[k] = dot[k + 1] = dot[k + 2] = 255; dot[k + 3] = Math.max(0, Math.min(255, (1 - d) * 2 * 255));
+    }
+    const dotTex = new THREE.DataTexture(dot, S, S, THREE.RGBAFormat); dotTex.needsUpdate = true;
+    motes = new THREE.Points(g, new THREE.PointsMaterial({ map: dotTex, alphaTest: 0.02, color: cfg.motes, size: cfg.fall ? 0.11 : 0.07, transparent: true, opacity: cfg.fall ? 0.95 : 0.75, depthWrite: false, blending: cfg.fall ? THREE.NormalBlending : THREE.AdditiveBlending, sizeAttenuation: true }));
     motes.frustumCulled = false;
     scene.add(motes);
   }
@@ -372,7 +394,7 @@ export function createWorld(container: HTMLElement, world: World, opts: Opts = {
       const p = motes.geometry.attributes.position as THREE.BufferAttribute;
       for (let i = 0; i < p.count; i++) {
         const wz = -moteSeed[i * 4 + 2], rel = (((camZ - wz) % 34) + 34) % 34;
-        p.setXYZ(i, x + moteSeed[i * 4] + Math.sin(time * 0.3 + moteSeed[i * 4 + 3]) * 0.6, moteSeed[i * 4 + 1] + Math.sin(time * 0.5 + moteSeed[i * 4 + 3] * 2) * 0.3, camZ - rel);
+        p.setXYZ(i, x + moteSeed[i * 4] + Math.sin(time * 0.3 + moteSeed[i * 4 + 3]) * 0.6, cfg.fall ? 0.1 + ((((moteSeed[i * 4 + 1] - time * (0.45 + moteSeed[i * 4 + 3] * 0.06)) % 6) + 6) % 6) : moteSeed[i * 4 + 1] + Math.sin(time * 0.5 + moteSeed[i * 4 + 3] * 2) * 0.3, camZ - rel);
       }
       p.needsUpdate = true;
     }

@@ -119,7 +119,7 @@ function build(w: World) {
       fill={w.haze} opacity={0.42} />
   );
 
-  if (w.id === 'woodland') {
+  if (w.id === 'woodland' || w.id === 'autumn') {
     const r0 = ridgeFn({ base: 170, amp: 30, freq: 3, seed: 11 });
     const r1 = ridgeFn({ base: 192, amp: 22, freq: 4, seed: 12 });
     const r2 = ridgeFn({ base: 222, amp: 18, freq: 5, seed: 13 });
@@ -171,7 +171,7 @@ function build(w: World) {
       </>
     );
   }
-  if (w.id === 'mountain') {
+  if (w.id === 'mountain' || w.id === 'winter') {
     const p0 = ridgeFn({ base: 200, amp: 90, freq: 2.4, sharp: true, seed: 41 });
     const p1 = ridgeFn({ base: 210, amp: 50, freq: 3.2, sharp: true, seed: 42 });
     const h0 = ridgeFn({ base: 236, amp: 26, freq: 2.5, seed: 43 });

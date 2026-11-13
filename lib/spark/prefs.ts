@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type WorldId = 'woodland' | 'coastal' | 'mountain' | 'garden' | 'simple';
+export type WorldId = 'woodland' | 'coastal' | 'mountain' | 'garden' | 'autumn' | 'winter' | 'simple';
 
 export type Prefs = {
   world: WorldId;

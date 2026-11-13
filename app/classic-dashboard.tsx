@@ -472,7 +472,7 @@ export default function Dashboard() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['rgba(138,43,226,0.25)', 'rgba(0,234,255,0.10)']} style={styles.bgGlow} />
+      <LinearGradient colors={['rgba(242,166,90,0.25)', 'rgba(156,197,161,0.10)']} style={styles.bgGlow} />
 
       {/* Hero */}
       <View style={styles.hero}>
@@ -558,7 +558,7 @@ export default function Dashboard() {
           activeOpacity={0.9}
         >
           <LinearGradient
-            colors={[colors.accent, colors.accent2]}
+            colors={[colors.accent, '#8E4214']}
             start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
             style={styles.primaryCtaGrad}
           >
@@ -1008,7 +1008,7 @@ export default function Dashboard() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: Platform.OS === 'web' ? 0 : pad.lg },
-  bgGlow: { position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
+  bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
   hero: { flexDirection: 'row', alignItems: 'center', paddingTop: 56, paddingBottom: 18, paddingHorizontal: Platform.OS === 'web' ? pad.xl : 0, maxWidth: 800, width: '100%', alignSelf: 'center' },
   title: { color: colors.text, fontSize: 26, fontWeight: '800' },
   subtitle: { color: colors.sub, marginTop: 6 },

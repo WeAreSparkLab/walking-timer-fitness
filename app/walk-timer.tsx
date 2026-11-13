@@ -92,8 +92,8 @@ type Interval = { pace: Pace; duration: number };
 
 const PACE_STYLES: Record<Pace, { border: string; bg: string }> = {
   WARMUP: { border: '#00d98b', bg: 'rgba(0,217,139,0.15)' },
-  FAST: { border: colors.accent, bg: 'rgba(138,43,226,0.14)' },
-  SLOW: { border: colors.accent2, bg: 'rgba(0,234,255,0.14)' },
+  FAST: { border: colors.accent, bg: 'rgba(242,166,90,0.14)' },
+  SLOW: { border: colors.accent2, bg: 'rgba(156,197,161,0.14)' },
   COOLDOWN: { border: '#66a6ff', bg: 'rgba(102,166,255,0.15)' },
 };
 
@@ -464,7 +464,7 @@ export default function WalkTimer() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['rgba(138,43,226,0.2)', 'rgba(0,234,255,0.08)']} style={styles.bgGlow} />
+      <LinearGradient colors={['rgba(242,166,90,0.2)', 'rgba(156,197,161,0.08)']} style={styles.bgGlow} />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/dashboard')} style={styles.iconBtn}>
@@ -752,7 +752,7 @@ export default function WalkTimer() {
           style={[styles.ctrl, { flex: 1, opacity: sessionId && !isHost ? 0.5 : 1 }]}
           activeOpacity={0.9}
         >
-          <LinearGradient colors={[colors.accent, colors.accent2]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.ctrlGrad}>
+          <LinearGradient colors={[colors.accent, '#8E4214']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.ctrlGrad}>
             <Ionicons name={isRunning ? 'pause' : 'play'} size={20} color={colors.text} />
             <Text style={styles.ctrlText}>{isRunning ? 'Pause' : 'Start'}</Text>
           </LinearGradient>
@@ -791,7 +791,7 @@ export default function WalkTimer() {
           activeOpacity={0.9}
         >
           <LinearGradient 
-            colors={[colors.accent, colors.accent2]} 
+            colors={[colors.accent, '#8E4214']} 
             start={{ x: 0, y: 0.5 }} 
             end={{ x: 1, y: 0.5 }} 
             style={styles.chatFabGrad}
@@ -887,7 +887,7 @@ export default function WalkTimer() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: pad.lg },
-  bgGlow: { position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
+  bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
   scrollContent: { flex: 1 },
   scrollContentContainer: { paddingBottom: 120 },
   header: { paddingTop: 56, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -1047,10 +1047,10 @@ const styles = StyleSheet.create({
   roleIndicator: {
     marginTop: 12,
     padding: 10,
-    backgroundColor: 'rgba(138,43,226,0.1)',
+    backgroundColor: 'rgba(242,166,90,0.1)',
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: 'rgba(138,43,226,0.3)',
+    borderColor: 'rgba(242,166,90,0.3)',
     alignItems: 'center',
   },
   roleText: {
@@ -1193,7 +1193,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   messageBubbleMe: {
-    backgroundColor: 'rgba(138,43,226,0.15)',
+    backgroundColor: 'rgba(242,166,90,0.15)',
     alignSelf: 'flex-end',
     borderColor: colors.accent,
   },
@@ -1236,7 +1236,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.md,
-    backgroundColor: 'rgba(138,43,226,0.15)',
+    backgroundColor: 'rgba(242,166,90,0.15)',
     borderWidth: 1,
     borderColor: colors.accent,
   },

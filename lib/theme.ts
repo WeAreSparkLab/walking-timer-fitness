@@ -1,22 +1,23 @@
-// lib/theme.ts
+// lib/theme.ts — legacy palette, now mapped onto the Spark Walk identity
+// (lib/spark/tokens.ts) so older screens match the redesign.
 export const colors = {
-  bg: '#0e1223',                 // deep navy
-  card: 'rgba(22, 28, 54, 0.85)',
-  line: 'rgba(106, 13, 173, 0.35)', // purple outline/glow
-  text: '#ffffff',
-  sub: '#9aa0b4',
-  accent: '#8a2be2',             // purple (generic primary)
-  accent2: '#00eaff',            // cyan (generic secondary)
-  success: '#00d98b',
-  danger: '#ff4d6d',
+  bg: '#0D1310',                 // deep evergreen night
+  card: 'rgba(246,241,231,0.06)',
+  line: 'rgba(246,241,231,0.12)',
+  text: '#F6F1E7',               // warm ivory
+  sub: '#C2BFB3',
+  accent: '#B4561C',             // deep ember (white text 4.9:1)
+  accent2: '#9CC5A1',            // moss
+  success: '#8FD3B0',
+  danger: '#FF8A7A',
 };
 
-export const radius = { lg: 20, md: 14, sm: 10 };
+export const radius = { lg: 26, md: 18, sm: 12 };
 export const pad = { xl: 28, lg: 22, md: 16, sm: 12 };
 
 export const shadow = {
   card: {
-    shadowColor: '#6a0dad',
+    shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
@@ -24,17 +25,10 @@ export const shadow = {
   },
 };
 
-/**
- * Pace palette — consistent across editor + timer
- * Feel free to swap hexes; bg uses a soft translucent tint.
- */
-export const paceColors: Record<'WARMUP'|'FAST'|'SLOW'|'COOLDOWN', {
-  fg: string;      // text/icon color
-  border: string;  // stroke / outline
-  bg: string;      // chip / badge background
-}> = {
-  WARMUP:   { fg: '#00d98b', border: '#00d98b', bg: 'rgba(0,217,139,0.14)' },  // green
-  FAST:     { fg: '#ff6bd6', border: '#ff6bd6', bg: 'rgba(255,107,214,0.14)' },// magenta
-  SLOW:     { fg: '#00eaff', border: '#00eaff', bg: 'rgba(0,234,255,0.14)' },  // cyan
-  COOLDOWN: { fg: '#66a6ff', border: '#66a6ff', bg: 'rgba(102,166,255,0.15)' } // blue
+/** Pace palette — matches phaseTone in lib/spark/tokens.ts */
+export const paceColors: Record<'WARMUP'|'FAST'|'SLOW'|'COOLDOWN', { fg: string; border: string; bg: string }> = {
+  WARMUP:   { fg: '#F5B860', border: '#F5B860', bg: 'rgba(245,184,96,0.14)' },
+  FAST:     { fg: '#FF8C6B', border: '#FF8C6B', bg: 'rgba(255,140,107,0.14)' },
+  SLOW:     { fg: '#8FD3B0', border: '#8FD3B0', bg: 'rgba(143,211,176,0.14)' },
+  COOLDOWN: { fg: '#A9BCFF', border: '#A9BCFF', bg: 'rgba(169,188,255,0.15)' },
 };
