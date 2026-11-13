@@ -173,6 +173,13 @@ export default function Dashboard() {
           </Card>
         ) : null}
 
+        {/* Shortcuts */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <Button label="Friends" icon="heart-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/friends')} />
+          <Button label="Profile" icon="person-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/profile')} />
+          <Button label="Classic" icon="albums-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} a11yHint="Opens the previous home screen" onPress={() => router.push('/classic-dashboard')} />
+        </View>
+
         {/* Invitations */}
         {invites.map(inv => (
           <Card key={inv.id} style={{ gap: 10 }}>
@@ -274,12 +281,6 @@ export default function Dashboard() {
           <Toggle label="Low-power mode" value={prefs.lowPower} onChange={v => setPrefs({ lowPower: v })} note="Turns off scenery and animation to save battery." />
         </Section>
 
-        {/* Footer */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          <Button label="Friends" icon="heart-outline" kind="secondary" onPress={() => router.push('/friends')} />
-          <Button label="Profile" icon="person-outline" kind="secondary" onPress={() => router.push('/profile')} />
-          <Button label="Classic view" icon="albums-outline" kind="quiet" onPress={() => router.push('/classic-dashboard')} />
-        </View>
         <Text style={[type.small, { color: ink.faint, textAlign: 'center' }]}>Your pace. Your path. Better together.</Text>
       </View>
     </ScrollView>

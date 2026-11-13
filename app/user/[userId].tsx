@@ -397,7 +397,7 @@ export default function UserProfilePage() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { width: '100%', maxWidth: 600, alignSelf: 'center', 
     flex: 1,
     backgroundColor: colors.bg,
   },

@@ -315,7 +315,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: pad.lg },
+  container: { width: '100%', maxWidth: 600, alignSelf: 'center',  flex: 1, backgroundColor: colors.bg, paddingHorizontal: pad.lg },
   bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
   header: { paddingTop: 56, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { color: colors.text, fontSize: 18, fontWeight: '800' },

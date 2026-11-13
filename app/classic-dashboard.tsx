@@ -1007,14 +1007,14 @@ export default function Dashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: Platform.OS === 'web' ? 0 : pad.lg },
+  container: { width: '100%', maxWidth: 600, alignSelf: 'center',  flex: 1, backgroundColor: colors.bg, paddingHorizontal: Platform.OS === 'web' ? 0 : pad.lg },
   bgGlow: { opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
-  hero: { flexDirection: 'row', alignItems: 'center', paddingTop: 56, paddingBottom: 18, paddingHorizontal: Platform.OS === 'web' ? pad.xl : 0, maxWidth: 800, width: '100%', alignSelf: 'center' },
+  hero: { flexDirection: 'row', alignItems: 'center', paddingTop: 56, paddingBottom: 18, paddingHorizontal: Platform.OS === 'web' ? pad.md : 0, width: '100%' },
   title: { color: colors.text, fontSize: 26, fontWeight: '800' },
   subtitle: { color: colors.sub, marginTop: 6 },
   settingsButton: { padding: 8, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
   settingsIcon: { fontSize: 20 },
-  content: { flex: 1, paddingHorizontal: Platform.OS === 'web' ? pad.xl : 0, maxWidth: 800, width: '100%', alignSelf: 'center' },
+  content: { flex: 1, paddingHorizontal: Platform.OS === 'web' ? pad.md : 0, width: '100%' },
   statsRow: { flexDirection: 'row', gap: 16, marginBottom: 24 },
   statCard: {
     flex: 1, backgroundColor: colors.card, borderRadius: radius.lg, padding: pad.lg,
