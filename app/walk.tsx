@@ -16,7 +16,10 @@ import { buzz, capabilities, chime, createWakeLock, speak, unlockAudio } from '.
 import { getPlanById } from '../lib/storage';
 import { recordWalkActivity } from '../lib/api/stats';
 
-type Loaded = { name: string; planId?: string; segments: Segment[]; clock?: ClockState };
+/** How fast the world moves past in each phase (1 = gentle stroll). */
+const PACE_SPEED = { WARMUP: 0.85, FAST: 1.7, SLOW: 0.75, COOLDOWN: 0.55 } as const;
+
+type Loaded ={ name: string; planId?: string; segments: Segment[]; clock?: ClockState };
 
 export default function WalkScreen() {
   useSparkFonts();
@@ -61,7 +64,7 @@ export default function WalkScreen() {
 
 function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const [prefs, setPrefs] = usePrefs();
   const { clock, phase, running, started, start, pause, resume } = useWalkClock(segments, initialClock);
   const [showSettings, setShowSettings] = useState(false);
@@ -173,10 +176,15 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
           <SettingsPanel prefs={prefs} setPrefs={setPrefs} caps={caps} wakeHeld={wakeHeld} running={running} C={C} />
         ) : null}
 
-        {/* Static scene band: decorative, never animated during a walk */}
+        {/* Live world: you travel through it at the pace of the current phase */}
         {showScene ? (
-          <View style={{ height: 92, borderRadius: round.lg, overflow: 'hidden', marginTop: 8, opacity: light ? 0.9 : 0.75 }}>
-            <Scenery world={world} still focus="horizon" />
+          <View style={{ height: Math.round(Math.min(280, Math.max(170, height * 0.3))), borderRadius: round.lg, overflow: 'hidden', marginTop: 8 }}>
+            {prefs.walkScene
+              ? <Scenery3D world={world} enabled={prefs.scene3d} economy speed={!started || !running ? 0 : PACE_SPEED[seg.pace]} />
+              : <Scenery world={world} still focus="horizon" />}
+            <View pointerEvents="none" style={{ position: 'absolute', left: 10, bottom: 10, backgroundColor: 'rgba(13,19,16,0.6)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: round.pill }}>
+              <Text style={[type.small, { color: '#F6F1E7', fontSize: 13 }]}>{world.name}</Text>
+            </View>
           </View>
         ) : null}
 
@@ -274,6 +282,7 @@ function SettingsPanel({ prefs, setPrefs, caps, wakeHeld, running, C }: any) {
         <Button label="Louder" kind="secondary" icon="add" tone={stepTone} style={{ minHeight: 48, paddingHorizontal: 12 }} onPress={() => setPrefs({ volume: Math.min(1, +(prefs.volume + 0.1).toFixed(1)) })} />
       </View>
       <BaseToggle palette={pal} label="Bright light mode" value={prefs.brightMode} onChange={v => setPrefs({ brightMode: v })} note="Dark text on light for strong sunshine." />
+      <BaseToggle palette={pal} label="Moving scenery during walks" value={prefs.walkScene} onChange={v => setPrefs({ walkScene: v })} note="Travel through your world at the pace of each phase. Uses more battery." />
       <BaseToggle palette={pal} label="Low-power mode" value={prefs.lowPower} onChange={v => setPrefs({ lowPower: v })} note="Hides scenery and animation everywhere." />
       <BaseToggle palette={pal} label="Keep screen on" value={prefs.keepAwake} onChange={v => setPrefs({ keepAwake: v })}
         note={!caps.wakeLock ? 'Not supported in this browser.' : running ? (wakeHeld ? 'Screen is being kept on.' : 'Waiting for permission.') : 'Starts when your walk starts.'} />

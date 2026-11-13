@@ -4,6 +4,6 @@ import React from 'react';
 import Scenery from './Scenery';
 import type { World } from '../../lib/spark/worlds';
 
-export default function Scenery3D({ world, still, fadeTo, label }: { world: World; still?: boolean; fadeTo?: string; label?: string; enabled?: boolean }) {
+export default function Scenery3D({ world, still, fadeTo, label }: { world: World; still?: boolean; fadeTo?: string; label?: string; enabled?: boolean; speed?: number; economy?: boolean }) {
   return <Scenery world={world} still={still} fadeTo={fadeTo} label={label} />;
 }

@@ -250,12 +250,12 @@ export default function Dashboard() {
 
         {/* World picker */}
         <Section title="Your walking world">
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 8 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             {[...WORLDS, SIMPLE_WORLD].map(w => {
               const on = prefs.world === w.id;
               return (
                 <Pressable key={w.id} onPress={() => setPrefs({ world: w.id })} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`${w.name}. ${w.line}`}
-                  style={{ width: 148, borderRadius: round.md, overflow: 'hidden', borderWidth: 2, borderColor: on ? ink.ember : ink.line }}>
+                  style={{ flexGrow: 1, flexBasis: 150, maxWidth: '48.5%' as any, borderRadius: round.md, overflow: 'hidden', borderWidth: 2, borderColor: on ? ink.ember : ink.line }}>
                   <View style={{ height: 96 }}><Scenery world={w} still /></View>
                   <View style={{ padding: 10, backgroundColor: ink.cardSolid, minHeight: 64 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -267,7 +267,7 @@ export default function Dashboard() {
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </View>
           <Text style={[type.small, { color: ink.faint }]}>Worlds are scenery for the app, not maps of where you are.</Text>
           <Toggle label="3D scenery" value={prefs.scene3d} onChange={v => setPrefs({ scene3d: v })} note="Switch off for the lighter 2D artwork." />
           <Toggle label="Low-power mode" value={prefs.lowPower} onChange={v => setPrefs({ lowPower: v })} note="Turns off scenery and animation to save battery." />

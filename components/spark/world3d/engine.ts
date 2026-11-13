@@ -6,8 +6,8 @@
 import * as THREE from 'three';
 import type { World } from '../../../lib/spark/worlds';
 
-export type WorldHandle = { dispose(): void };
-type Opts = { still?: boolean; onReady?: () => void; onFail?: () => void };
+export type WorldHandle = { dispose(): void; setSpeed(s: number): void };
+type Opts = { still?: boolean; speed?: number; maxFps?: number; lowQuality?: boolean; onReady?: () => void; onFail?: () => void };
 
 const LOOP = 160;
 const TILES = 4;
@@ -147,9 +147,9 @@ export function createWorld(container: HTMLElement, world: World, opts: Opts = {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.15;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !opts.lowQuality;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  let dpr = Math.min(window.devicePixelRatio || 1, 1.75);
+  let dpr = Math.min(window.devicePixelRatio || 1, opts.lowQuality ? 1 : 1.75);
   renderer.setPixelRatio(dpr);
   const canvas = renderer.domElement;
   canvas.style.cssText = 'width:100%;height:100%;display:block';
@@ -376,7 +376,7 @@ export function createWorld(container: HTMLElement, world: World, opts: Opts = {
   // ---- frame loop ----
   let raf = 0, disposed = false, visible = true, readySent = false;
   let camZ = -20, last = performance.now(), time = 0;
-  let frames = 0, acc = 0, level = 0;
+  let frames = 0, acc = 0, level = 0, speed = opts.speed ?? 1, target = speed, sinceDraw = 1;
   const look = new THREE.Vector3();
 
   const place = () => {
@@ -412,8 +412,12 @@ export function createWorld(container: HTMLElement, world: World, opts: Opts = {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     if (!visible) return;
-    time += dt;
-    camZ -= 1.15 * dt;
+    speed += (target - speed) * Math.min(1, dt * 1.5);
+    time += dt * (0.4 + 0.6 * Math.min(1, speed));
+    camZ -= 1.15 * speed * dt;
+    sinceDraw += dt;
+    if (opts.maxFps && sinceDraw < 1 / opts.maxFps) return;
+    sinceDraw = 0;
     if (camZ < -LOOP) camZ += LOOP;
     if (waterTex) { waterTex.offset.x = time * 0.012; waterTex.offset.y = time * 0.02; }
     render();
@@ -469,5 +473,5 @@ export function createWorld(container: HTMLElement, world: World, opts: Opts = {
   resize();
   if (opts.still) render();
   else raf = requestAnimationFrame(tick);
-  return { dispose };
+  return { dispose, setSpeed(s: number) { target = Math.max(0, s); } };
 }

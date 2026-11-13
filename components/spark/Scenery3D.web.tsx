@@ -6,7 +6,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { World } from '../../lib/spark/worlds';
 import Scenery from './Scenery';
 
-type Props = { world: World; still?: boolean; fadeTo?: string; label?: string; enabled?: boolean };
+type Props = {
+  world: World; still?: boolean; fadeTo?: string; label?: string; enabled?: boolean;
+  /** Travel speed: 0 = stopped, 1 = gentle stroll. Changes ease smoothly. */
+  speed?: number;
+  /** Frame cap and reduced quality for long sessions (battery). */
+  economy?: boolean;
+};
 
 function webglOK() {
   try {
@@ -15,8 +21,11 @@ function webglOK() {
   } catch { return false; }
 }
 
-export default function Scenery3D({ world, still, fadeTo, label, enabled = true }: Props) {
+export default function Scenery3D({ world, still, fadeTo, label, enabled = true, speed = 1, economy }: Props) {
   const host = useRef<HTMLDivElement>(null);
+  const handle = useRef<{ dispose(): void; setSpeed(s: number): void } | null>(null);
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
   const [live, setLive] = useState(false);
   const [hide2d, setHide2d] = useState(false);
   const use3d = enabled && world.layers.length > 0;
@@ -25,20 +34,24 @@ export default function Scenery3D({ world, still, fadeTo, label, enabled = true 
     setLive(false); setHide2d(false);
     if (!use3d || !webglOK()) return;
     let dead = false;
-    let handle: { dispose(): void } | undefined;
     let timer: any;
     import('./world3d/engine')
       .then(m => {
         if (dead || !host.current) return;
-        handle = m.createWorld(host.current, world, {
+        handle.current = m.createWorld(host.current, world, {
           still,
+          speed: speedRef.current,
+          maxFps: economy ? 30 : undefined,
+          lowQuality: economy,
           onReady: () => { if (!dead) { setLive(true); timer = setTimeout(() => !dead && setHide2d(true), 1200); } },
-          onFail: () => { if (!dead) { setLive(false); setHide2d(false); } },
+          onFail: () => { if (!dead) { handle.current = null; setLive(false); setHide2d(false); } },
         });
       })
       .catch(() => {});
-    return () => { dead = true; clearTimeout(timer); handle?.dispose(); };
-  }, [world.id, still, use3d]);
+    return () => { dead = true; clearTimeout(timer); handle.current?.dispose(); handle.current = null; };
+  }, [world.id, still, use3d, economy]);
+
+  useEffect(() => { handle.current?.setSpeed(speed); }, [speed]);
 
   return (
     <div role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true}
