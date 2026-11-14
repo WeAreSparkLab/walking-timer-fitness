@@ -93,6 +93,7 @@ export default function LoginScreen() {
     return (
       <View style={[styles.container, { justifyContent: 'center' }]}>
         <ActivityIndicator size="large" color={colors.accent} />
+        <Text style={{ color: colors.text, textAlign: 'center', marginTop: 18 }}>Spark Walk — a walking timer for brisk and easy intervals.</Text>
       </View>
     );
   }

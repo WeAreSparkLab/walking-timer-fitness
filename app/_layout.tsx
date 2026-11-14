@@ -1,4 +1,5 @@
-import { Stack, useRouter } from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
+import Head from "expo-router/head";
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../lib/theme';
 import { useEffect } from 'react';
@@ -11,6 +12,7 @@ import { requestNotificationPermission } from '../lib/webNotifications';
 
 export default function RootLayout() {
   const router = useRouter();
+  const pathname = usePathname();
 
   // Cookie-free page views (private IDs redacted, see lib/analytics.ts)
   useEffect(() => { startAnalytics(); }, []);
@@ -132,6 +134,15 @@ export default function RootLayout() {
 
   return (
     <>
+      <Head>
+        <title>Spark Walk — Interval Walking Timer</title>
+        <meta name="description" content="A free walking timer with sound cues for alternating brisk and easy intervals. Try the 21-minute default walk or create your own plan." />
+        <meta property="og:title" content="Spark Walk — Interval Walking Timer" />
+        <meta property="og:description" content="A simple timer for brisk and easy walking intervals, with sound cues and custom walks." />
+        <meta property="og:type" content="website" />
+        {pathname === '/' && <meta property="og:url" content="https://walks.wearesparklab.com/" />}
+        {pathname === '/' && <link rel="canonical" href="https://walks.wearesparklab.com/" />}
+      </Head>
       <StatusBar style="light" backgroundColor={colors.bg} />
       <Stack
         screenOptions={{
