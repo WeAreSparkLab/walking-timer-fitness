@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { addNotificationResponseListener } from '../lib/notifications';
 import type { NotificationResponse } from 'expo-notifications';
 import '../lib/install'; // starts listening for the browser's install event right away
+import '../lib/recovery'; // sends password-reset email links to /reset-password
 import { startAnalytics } from '../lib/analytics';
 import { Platform } from 'react-native';
 import { requestNotificationPermission } from '../lib/webNotifications';
