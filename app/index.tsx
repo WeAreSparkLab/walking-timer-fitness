@@ -93,7 +93,13 @@ export default function LoginScreen() {
     return (
       <View style={[styles.container, { justifyContent: 'center' }]}>
         <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={{ color: colors.text, textAlign: 'center', marginTop: 18 }}>Spark Walk — a walking timer for brisk and easy intervals.</Text>
+        <Text accessibilityRole="header" style={{ color: colors.text, textAlign: 'center', marginTop: 18 }}>Spark Walk: your interval walking timer</Text>
+        <Text style={{ color: colors.text, textAlign: 'center', marginTop: 12, maxWidth: 520, paddingHorizontal: 24 }}>
+          Set a comfortable pace with alternating brisk and easy walking intervals. Follow the sound cues, try the 21-minute default walk, or create a plan that suits your day.
+        </Text>
+        <Text style={{ color: colors.text, textAlign: 'center', marginTop: 12, maxWidth: 520, paddingHorizontal: 24 }}>
+          Spark Walk keeps track of the timing so you can focus on moving. Your walk can be short, gentle, or more energetic — make it work for you.
+        </Text>
       </View>
     );
   }
