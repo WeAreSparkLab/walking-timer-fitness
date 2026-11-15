@@ -1,8 +1,8 @@
 // app/dashboard.tsx — Spark Walk home (Phase 1 redesign).
-// The previous dashboard lives at /classic-dashboard and is still reachable.
+// (The previous dashboard was retired; /classic-dashboard redirects here.)
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, Image, ActivityIndicator, Platform } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabaseClient';
 import { getPlans, WalkPlan } from '../lib/storage';
@@ -10,14 +10,17 @@ import { getRecentActivities, getPeriodStats, Activity } from '../lib/api/stats'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PENDING_JOIN_KEY } from '../lib/api/together';
 import { useMyProfile } from '../lib/useMyProfile';
+import { ensureMyProfile } from '../lib/api/profile';
 import { loadActiveWalk, ActiveWalk, elapsedMs } from '../lib/walk/engine';
 import { PRESETS, buildSegments, segmentsFromIntervals, totalSeconds, fmtMinutes, fmtClock } from '../lib/walk/schedule';
 import { usePrefs, prefersReducedMotion } from '../lib/spark/prefs';
 import { WORLDS, SIMPLE_WORLD, getWorld } from '../lib/spark/worlds';
 import { ink, round, space } from '../lib/spark/tokens';
-import { Button, Card, Timeline, Toggle, type, useSparkFonts } from '../components/spark/ui';
+import { Button, Card, Collapsible, Timeline, Toggle, type, useSparkFonts } from '../components/spark/ui';
 import Scenery from '../components/spark/Scenery';
 import Scenery3D from '../components/spark/Scenery3D';
+import HomeSettings from '../components/spark/HomeSettings';
+import InstallNudge from '../components/spark/InstallNudge';
 
 type GroupWalk = { id: string; name: string | null; status: string; host_id: string; created_at: string; count: number };
 type Invite = { id: string; data: { session_id?: string; session_name?: string; host_name?: string; link?: string; token?: string } };
@@ -46,12 +49,18 @@ export default function Dashboard() {
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const { section } = useLocalSearchParams<{ section?: string }>();
+  useEffect(() => {
+    if (section !== 'settings' || !authChecked || Platform.OS !== 'web') return;
+    const t = setTimeout(() => document.getElementById('settings')?.scrollIntoView({ behavior: 'smooth' }), 500);
+    return () => clearTimeout(t);
+  }, [section, authChecked]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) router.replace('/');
       else {
-        setUserId(session.user.id); setAuthChecked(true);
+        setUserId(session.user.id); setAuthChecked(true); ensureMyProfile().catch(() => {});
         // Opened an invitation before signing in? Continue to it now.
         AsyncStorage.getItem(PENDING_JOIN_KEY).then(t => { if (t) router.push(`/join/${t}`); }).catch(() => {});
       }
@@ -157,7 +166,7 @@ export default function Dashboard() {
           <Card style={{ flex: 1, gap: 8, minHeight: 128 }} onPress={() => router.push('/together/new')} label="Walk together: create a group walk and invite friends">
             <Ionicons name="people-outline" size={26} color={ink.moss} />
             <Text style={type.label}>Walk together</Text>
-            <Text style={type.small}>Invite friends, wherever they are</Text>
+            <Text style={type.small}>Create a group walk and invite friends</Text>
           </Card>
           <Card style={{ flex: 1, gap: 8, minHeight: 128 }} onPress={() => setJoinOpen(o => !o)} label="Join a friend’s walk with an invitation link">
             <Ionicons name="link-outline" size={26} color={ink.moss} />
@@ -175,6 +184,14 @@ export default function Dashboard() {
             <Button label="Join walk" onPress={submitJoin} />
           </Card>
         ) : null}
+
+        {/* Shortcuts */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <Button label="Friends" icon="heart-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/friends')} />
+          <Button label="Profile" icon="person-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/profile')} />
+        </View>
+
+        <InstallNudge onHowTo={() => document.getElementById('settings')?.scrollIntoView({ behavior: 'smooth' })} />
 
         {/* Invitations */}
         {invites.map(inv => (
@@ -206,7 +223,7 @@ export default function Dashboard() {
         ) : null}
 
         {/* Walks */}
-        <Section title="Choose a walk" action={{ label: 'Create', icon: 'add', onPress: () => router.push('/create-walk') }}>
+        <Section title="Choose a walk (just for you)" action={{ label: 'Create', icon: 'add', onPress: () => router.push('/create-walk') }}>
           {sortedPlans.map(p => {
             const segs = segmentsFromIntervals(p.intervals);
             return <WalkRow key={p.id} name={p.name} sub={`${p.favourite ? '★ Favourite' : 'Your plan'} · ${fmtMinutes(totalSeconds(segs))}`} segs={segs}
@@ -218,12 +235,13 @@ export default function Dashboard() {
             return <WalkRow key={p.id} name={p.name} sub={`${p.blurb} · ${fmtMinutes(totalSeconds(segs))}`} segs={segs}
               onPress={() => router.push({ pathname: '/walk', params: { preset: p.id } })} />;
           })}
-          <Text style={[type.small, { color: ink.faint }]}>Ready-made walks are examples, not medical advice. Go at a pace that feels comfortable.</Text>
+          <Text style={[type.small, { color: ink.faint }]}>These are for walking on your own. To walk with friends, tap Walk together to create a group walk. Ready-made walks are examples, not medical advice, so go at a pace that feels comfortable.</Text>
         </Section>
 
         {/* Group walks */}
         {groups.length ? (
-          <Section title="Your group walks" action={{ label: 'New', icon: 'add', onPress: () => router.push('/together/new') }}>
+          <Collapsible title={`Your group walks (${groups.length})`} storageKey="sparkwalk.home.groupWalks"
+            action={<Button label="New" icon="add" kind="quiet" onPress={() => router.push('/together/new')} style={{ minHeight: 48, paddingHorizontal: 8 }} />}>
             {groups.slice(0, 3).map(g => (
               <Card key={g.id} onPress={() => router.push(`/together/${g.id}`)} label={`Open group walk ${g.name || ''}`}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 }}>
@@ -235,7 +253,7 @@ export default function Dashboard() {
                 <Ionicons name="chevron-forward" size={20} color={ink.sub} />
               </Card>
             ))}
-          </Section>
+          </Collapsible>
         ) : null}
 
         {/* Recent */}
@@ -273,16 +291,10 @@ export default function Dashboard() {
             })}
           </View>
           <Text style={[type.small, { color: ink.faint }]}>Worlds are scenery for the app, not maps of where you are.</Text>
-          <Toggle label="3D scenery" value={prefs.scene3d} onChange={v => setPrefs({ scene3d: v })} note="Switch off for the lighter 2D artwork." />
-          <Toggle label="Low-power mode" value={prefs.lowPower} onChange={v => setPrefs({ lowPower: v })} note="Turns off scenery and animation to save battery." />
         </Section>
 
-        {/* Footer */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          <Button label="Friends" icon="heart-outline" kind="secondary" onPress={() => router.push('/friends')} />
-          <Button label="Profile" icon="person-outline" kind="secondary" onPress={() => router.push('/profile')} />
-          <Button label="Classic view" icon="albums-outline" kind="quiet" onPress={() => router.push('/classic-dashboard')} />
-        </View>
+        <HomeSettings />
+
         <Text style={[type.small, { color: ink.faint, textAlign: 'center' }]}>Your pace. Your path. Better together.</Text>
       </View>
     </ScrollView>

@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { ensureMyProfile } from './profile';
 
 /** Exchange a token from a deep link for a session_id and join */
 export async function redeemInviteToken(token: string) {
@@ -7,6 +8,8 @@ export async function redeemInviteToken(token: string) {
   if (userError || !user) {
     throw new Error('You must be logged in to join a session');
   }
+
+  await ensureMyProfile(); // joining needs a profile row
 
   // If you created an RPC, use it; otherwise read invite + join.
   const { data, error } = await supabase

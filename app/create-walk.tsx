@@ -22,7 +22,9 @@ const stepFor = (sec: number) => (sec < 120 ? 15 : 30);
 export default function CreateWalk() {
   useSparkFonts();
   const router = useRouter();
-  const { editId, preset } = useLocalSearchParams<{ editId?: string; preset?: string }>();
+  const { editId, preset, returnTo } = useLocalSearchParams<{ editId?: string; preset?: string; returnTo?: string }>();
+  // Where to go after saving or going back (only in-app paths are allowed)
+  const backTo = typeof returnTo === 'string' && /^\/[A-Za-z0-9\-_\/]*$/.test(returnTo) ? returnTo : '/dashboard';
   const [loaded, setLoaded] = useState(!editId);
   const [planId, setPlanId] = useState<string | null>(null);
   const [createdAt, setCreatedAt] = useState<number>(Date.now());
@@ -75,7 +77,7 @@ export default function CreateWalk() {
     const id = planId ?? uuid();
     await savePlan({ id, name: name.trim(), intervals: intervalsFromSegments(segments), createdAt, favourite });
     if (startAfter) router.replace({ pathname: '/walk', params: { planId: id } });
-    else router.replace('/dashboard');
+    else router.replace(backTo as any);
   };
 
   const del = async () => {
@@ -89,7 +91,7 @@ export default function CreateWalk() {
   return (
     <View style={{ flex: 1, backgroundColor: ink.bg }}>
       <View style={{ paddingTop: 48, paddingHorizontal: space.md, flexDirection: 'row', alignItems: 'center' }}>
-        <Pressable onPress={() => router.replace('/dashboard')} accessibilityRole="button" accessibilityLabel="Back to home without saving"
+        <Pressable onPress={() => router.replace(backTo as any)} accessibilityRole="button" accessibilityLabel="Back without saving"
           style={{ minWidth: 48, minHeight: 48, justifyContent: 'center' }}>
           <Ionicons name="chevron-back" size={28} color={ink.text} />
         </Pressable>

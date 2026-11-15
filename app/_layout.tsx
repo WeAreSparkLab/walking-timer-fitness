@@ -1,15 +1,22 @@
-import { Stack, useRouter } from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
+import Head from "expo-router/head";
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../lib/theme';
 import { useEffect } from 'react';
 import { addNotificationResponseListener } from '../lib/notifications';
 import type { NotificationResponse } from 'expo-notifications';
-import InstallPrompt from '../lib/InstallPrompt';
+import '../lib/install'; // starts listening for the browser's install event right away
+import '../lib/recovery'; // sends password-reset email links to /reset-password
+import { startAnalytics } from '../lib/analytics';
 import { Platform } from 'react-native';
 import { requestNotificationPermission } from '../lib/webNotifications';
 
 export default function RootLayout() {
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Cookie-free page views (private IDs redacted, see lib/analytics.ts)
+  useEffect(() => { startAnalytics(); }, []);
 
   // Ensure web push subscription is created after permission is granted (one-time check)
   useEffect(() => {
@@ -33,7 +40,7 @@ export default function RootLayout() {
       // Add theme color
       const themeColor = document.createElement('meta');
       themeColor.name = 'theme-color';
-      themeColor.content = '#B4561C';
+      themeColor.content = '#0D1310';
       document.head.appendChild(themeColor);
       
       // Add apple touch icon
@@ -128,6 +135,15 @@ export default function RootLayout() {
 
   return (
     <>
+      <Head>
+        <title>Spark Walk — Interval Walking Timer</title>
+        <meta name="description" content="A free walking timer with sound cues for alternating brisk and easy intervals. Try the 21-minute default walk or create your own plan." />
+        <meta property="og:title" content="Spark Walk — Interval Walking Timer" />
+        <meta property="og:description" content="A simple timer for brisk and easy walking intervals, with sound cues and custom walks." />
+        <meta property="og:type" content="website" />
+        {pathname === '/' && <meta property="og:url" content="https://walks.wearesparklab.com/" />}
+        {pathname === '/' && <link rel="canonical" href="https://walks.wearesparklab.com/" />}
+      </Head>
       <StatusBar style="light" backgroundColor={colors.bg} />
       <Stack
         screenOptions={{
@@ -142,7 +158,6 @@ export default function RootLayout() {
         <Stack.Screen name="create-walk" />
         <Stack.Screen name="profile" />
       </Stack>
-      <InstallPrompt />
     </>
   );
 }

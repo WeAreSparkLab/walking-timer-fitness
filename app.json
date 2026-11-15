@@ -24,7 +24,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png",
+      "favicon": "./public/icon-192.png",
       "name": "Spark Walk - Interval Walking Timer",
       "shortName": "Spark Walk",
       "description": "Interval walking timer made easy",

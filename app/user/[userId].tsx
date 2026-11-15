@@ -397,7 +397,7 @@ export default function UserProfilePage() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { width: '100%', maxWidth: 600, alignSelf: 'center', 
     flex: 1,
     backgroundColor: colors.bg,
   },
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bgGlow: { opacity: 0.3, 
+  bgGlow: { display: 'none',  opacity: 0.3, 
     position: 'absolute',
     width: '120%',
     height: '120%',

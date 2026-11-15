@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ink, phaseTone, round, space } from '../lib/spark/tokens';
 import { usePrefs } from '../lib/spark/prefs';
 import { getWorld } from '../lib/spark/worlds';
-import { Button, Card, PhaseIcon, Timeline, Toggle as BaseToggle, LIGHT_TOGGLE, type, useSparkFonts } from '../components/spark/ui';
+import { Button, Card, PhaseIcon, Timeline, Toggle, LIGHT_TOGGLE, type, useSparkFonts } from '../components/spark/ui';
 import Scenery from '../components/spark/Scenery';
 import Scenery3D from '../components/spark/Scenery3D';
 import { PRESETS, PHASE_COPY, Segment, buildSegments, fmtClock, fmtMinutes, segmentsFromIntervals, totalSeconds } from '../lib/walk/schedule';
@@ -71,12 +71,10 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
   const { width, height } = useWindowDimensions();
   const [prefs, setPrefs] = usePrefs();
   const { clock, phase, running, started, start, pause, resume } = useWalkClock(segments, initialClock);
-  const [showSettings, setShowSettings] = useState(false);
   const [confirmFinish, setConfirmFinish] = useState(false);
   const [finished, setFinished] = useState<null | { seconds: number; complete: boolean; saved: 'saving' | 'saved' | 'failed' }>(null);
   const [wakeHeld, setWakeHeld] = useState(false);
   const total = totalSeconds(segments);
-  const caps = useMemo(capabilities, []);
   const light = prefs.brightMode;
   const world = getWorld(prefs.world);
 
@@ -193,17 +191,10 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
           <Ionicons name="chevron-back" size={28} color={C.text} />
         </Pressable>
         <Text style={[type.label, { color: C.text, flex: 1, textAlign: 'center' }]} numberOfLines={1}>{name}</Text>
-        <Pressable onPress={() => setShowSettings(s => !s)} accessibilityRole="button" accessibilityLabel="Walk settings: sound, voice, vibration, display"
-          style={{ minWidth: 48, minHeight: 48, alignItems: 'flex-end', justifyContent: 'center' }}>
-          <Ionicons name={showSettings ? 'close' : 'options-outline'} size={26} color={C.text} />
-        </Pressable>
+        <View style={{ width: 48 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: space.md, paddingBottom: 40, maxWidth: 560, width: '100%', alignSelf: 'center' }}>
-        {showSettings ? (
-          <SettingsPanel prefs={prefs} setPrefs={setPrefs} caps={caps} wakeHeld={wakeHeld} running={running} C={C} />
-        ) : null}
-
         {/* Live world: you travel through it at the pace of the current phase */}
         {showScene ? (
           <View style={{ height: Math.round(Math.min(280, Math.max(170, height * 0.3))), borderRadius: round.lg, overflow: 'hidden', marginTop: 8 }}>
@@ -261,7 +252,12 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
         {/* Controls */}
         <View style={{ marginTop: 24, gap: 12 }}>
           {!started ? (
-            <Button big label="Start walk" icon="play" onPress={onStart} a11yHint="Starts the timer with your chosen cues" />
+            <>
+              <Button big label="Start walk" icon="play" onPress={onStart} a11yHint="Starts the timer with your chosen cues" />
+              <Toggle label="Bright light mode" value={prefs.brightMode} onChange={v => setPrefs({ brightMode: v })} palette={light ? LIGHT_TOGGLE : undefined} note="Light screen with dark text, for strong sunshine." />
+              <Button label="Sound and display settings" icon="options-outline" kind="quiet" onPress={() => router.push({ pathname: '/dashboard', params: { section: 'settings' } })}
+                tone={light ? { bg: 'transparent', fg: '#121212' } : undefined} a11yHint="Opens settings on the home screen" />
+            </>
           ) : confirmFinish ? (
             <Card style={{ gap: 12, backgroundColor: C.card, borderColor: C.line }}>
               <Text style={[type.label, { color: C.text }]}>Finish now? We’ll save {fmtMinutes(phase.elapsed)} of walking.</Text>
@@ -288,33 +284,6 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
         </Text>
       </ScrollView>
     </View>
-  );
-}
-
-function SettingsPanel({ prefs, setPrefs, caps, wakeHeld, running, C }: any) {
-  const vol = Math.round(prefs.volume * 100);
-  const light = prefs.brightMode;
-  const pal = light ? LIGHT_TOGGLE : undefined;
-  const stepTone = light ? { bg: '#ECE6DA', fg: '#121212' } : undefined;
-  return (
-    <Card style={{ marginTop: 8, gap: 2, backgroundColor: C.card, borderColor: C.line }}>
-      <BaseToggle palette={pal} label="Spoken announcements" value={prefs.voice && caps.speech} onChange={v => setPrefs({ voice: v })}
-        note={caps.speech ? 'Plays over music briefly; it won’t stop your music.' : 'Not available in this browser.'} />
-      <BaseToggle palette={pal} label="Chimes" value={prefs.chime} onChange={v => setPrefs({ chime: v })} note="Rising for brisk, falling for easy, with a soft tick 10 seconds before. Keeps playing with your phone locked." />
-      <BaseToggle palette={pal} label="Vibration" value={prefs.vibrate} onChange={v => setPrefs({ vibrate: v })}
-        note={caps.vibrate ? undefined : 'Not supported here (iPhone browsers don’t allow it).'} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 56 }}>
-        <Text style={[type.label, { flex: 1, color: C.text }]}>Cue volume</Text>
-        <Button label="Quieter" kind="secondary" icon="remove" tone={stepTone} style={{ minHeight: 48, paddingHorizontal: 12 }} onPress={() => setPrefs({ volume: Math.max(0, +(prefs.volume - 0.1).toFixed(1)) })} />
-        <Text accessibilityLiveRegion="polite" style={[type.num, { width: 48, textAlign: 'center', color: C.text, fontSize: 16 }]}>{vol}%</Text>
-        <Button label="Louder" kind="secondary" icon="add" tone={stepTone} style={{ minHeight: 48, paddingHorizontal: 12 }} onPress={() => setPrefs({ volume: Math.min(1, +(prefs.volume + 0.1).toFixed(1)) })} />
-      </View>
-      <BaseToggle palette={pal} label="Bright light mode" value={prefs.brightMode} onChange={v => setPrefs({ brightMode: v })} note="Dark text on light for strong sunshine." />
-      <BaseToggle palette={pal} label="Moving scenery during walks" value={prefs.walkScene} onChange={v => setPrefs({ walkScene: v })} note="Travel through your world at the pace of each phase. Uses more battery." />
-      <BaseToggle palette={pal} label="Low-power mode" value={prefs.lowPower} onChange={v => setPrefs({ lowPower: v })} note="Hides scenery and animation everywhere." />
-      <BaseToggle palette={pal} label="Keep screen on" value={prefs.keepAwake} onChange={v => setPrefs({ keepAwake: v })}
-        note={!caps.wakeLock ? 'Not supported in this browser.' : running ? (wakeHeld ? 'Screen is being kept on.' : 'Waiting for permission.') : 'Starts when your walk starts.'} />
-    </Card>
   );
 }
 
