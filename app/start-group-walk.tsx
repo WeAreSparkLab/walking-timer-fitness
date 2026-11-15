@@ -5,6 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad, radius } from '../lib/theme';
 import { getPlans } from '../lib/storage';
+import { PRESETS, buildSegments, intervalsFromSegments, segmentsFromIntervals, totalSeconds, fmtMinutes } from '../lib/walk/schedule';
+import { ink, round, space } from '../lib/spark/tokens';
+import { Button, Card, Timeline, type, useSparkFonts } from '../components/spark/ui';
+
+// Ready-made walks, in the same shape as a saved plan so the rest of this screen treats them alike.
+const presetPlan = (p: (typeof PRESETS)[number]) => ({ id: `preset:${p.id}`, name: p.name, blurb: p.blurb, intervals: intervalsFromSegments(buildSegments(p.structure)) });
 import { createSession, createInvite, startSession, getSession, updateSession, deleteSession } from '../lib/api/sessions';
 import { listMyFriends } from '../lib/api/friends';
 import { supabase } from '../lib/supabaseClient';
@@ -12,6 +18,7 @@ import { sendNotificationToUser } from '../lib/api/notifications';
 import { ensureWebPushEnabled } from '../lib/webNotifications';
 
 export default function StartGroupWalk() {
+  useSparkFonts();
   const router = useRouter();
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const [sessionName, setSessionName] = useState('');
@@ -33,6 +40,10 @@ export default function StartGroupWalk() {
     ]);
     setPlans(plansData);
     setFriends(friendsData);
+    if (!editId) {
+      const first = [...plansData].sort((a: any, b: any) => Number(!!b.favourite) - Number(!!a.favourite))[0];
+      setSelectedPlan(first ?? presetPlan(PRESETS[0]));
+    }
 
     // Load existing session if editing
     if (editId) {
@@ -71,16 +82,8 @@ export default function StartGroupWalk() {
   };
 
   const handleCreateSession = async () => {
-    console.log('handleCreateSession called', { sessionName, selectedPlan });
-    
-    if (!sessionName.trim()) {
-      if (Platform.OS === 'web') {
-        window.alert('Please enter a name for this group walk');
-      } else {
-        Alert.alert('Name Required', 'Please enter a name for this group walk');
-      }
-      return;
-    }
+    const finalName = sessionName.trim() || selectedPlan?.name || 'Group walk';
+    if (!sessionName.trim()) setSessionName(finalName);
     if (!selectedPlan) {
       if (Platform.OS === 'web') {
         window.alert('Please select a walk plan');
@@ -94,7 +97,7 @@ export default function StartGroupWalk() {
       if (editId && sessionId) {
         // Update existing session
         console.log('Updating session...', { id: sessionId, name: sessionName, intervals: selectedPlan.intervals });
-        await updateSession(sessionId, sessionName, selectedPlan.intervals);
+        await updateSession(sessionId, finalName, selectedPlan.intervals);
         console.log('Session updated');
         
         if (Platform.OS === 'web') {
@@ -106,7 +109,7 @@ export default function StartGroupWalk() {
       } else {
         // Create new session
         console.log('Creating session...', { name: sessionName, intervals: selectedPlan.intervals });
-        const session = await createSession(sessionName, selectedPlan.intervals);
+        const session = await createSession(finalName, selectedPlan.intervals);
         console.log('Session created:', session);
         setSessionId(session.id);
         
@@ -116,12 +119,7 @@ export default function StartGroupWalk() {
         console.log('Invite token:', token);
         const link = `https://walks.wearesparklab.com/join/${token}`;
         setInviteLink(link);
-        
-        if (Platform.OS === 'web') {
-          window.alert('Session created! Share the invite link with your friends');
-        } else {
-          Alert.alert('Session Created!', 'Share the invite link with your friends');
-        }
+
       }
     } catch (error) {
       console.error('Failed to save session:', error);
@@ -320,54 +318,48 @@ export default function StartGroupWalk() {
 
   if (inviteLink && sessionId && !editId) {
     return (
-      <View style={styles.container}>
-        <LinearGradient colors={['rgba(242,166,90,0.2)', 'rgba(156,197,161,0.08)']} style={styles.bgGlow} />
-        
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.replace('/dashboard')} style={styles.iconBtn}>
-            <Text style={styles.iconText}>✕</Text>
+      <View style={{ flex: 1, backgroundColor: ink.bg, width: '100%', maxWidth: 600, alignSelf: 'center' }}>
+        <View style={{ paddingTop: 48, paddingHorizontal: space.md, flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => router.replace('/dashboard')} accessibilityRole="button" accessibilityLabel="Close. You can find this walk on the home screen."
+            style={{ minWidth: 48, minHeight: 48, justifyContent: 'center' }}>
+            <Ionicons name="close" size={28} color={ink.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Ready to Walk!</Text>
-          <TouchableOpacity onPress={handleDeleteSession} style={styles.iconBtn}>
-            <Ionicons name="trash-outline" size={24} color={colors.danger} />
+          <Text accessibilityRole="header" style={[type.label, { flex: 1, textAlign: 'center' }]}>Group walk ready</Text>
+          <TouchableOpacity onPress={handleDeleteSession} accessibilityRole="button" accessibilityLabel="Delete this group walk"
+            style={{ minWidth: 48, minHeight: 48, alignItems: 'flex-end', justifyContent: 'center' }}>
+            <Ionicons name="trash-outline" size={22} color={ink.danger} />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.content}>
-          <View style={styles.successCard}>
-            <Text style={styles.successIcon}>✓</Text>
-            <Text style={styles.successTitle}>{sessionName}</Text>
-            <Text style={styles.successSub}>Session created successfully</Text>
+        <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: 60, gap: space.lg }}>
+          <View style={{ gap: 6 }}>
+            <Text style={type.eyebrow}>All set</Text>
+            <Text style={type.display}>{sessionName}</Text>
+            <Text style={type.body}>Your group walk is created. Next, invite your friends, then start when you’re all here.</Text>
           </View>
 
-          <View style={styles.inviteSection}>
-            <Text style={styles.label}>Invite Friends</Text>
-            <View style={styles.linkBox}>
-              <Text style={styles.linkText} numberOfLines={1}>{inviteLink}</Text>
+          <Card style={{ gap: 12 }}>
+            <Text style={type.title}>1. Invite your friends</Text>
+            <Text style={type.small}>Send them this private link. They can join from wherever they are.</Text>
+            <View style={{ borderRadius: round.sm, borderWidth: 1, borderColor: ink.line, backgroundColor: 'rgba(0,0,0,0.2)', padding: 12 }}>
+              <Text style={[type.small, { color: ink.text }]} numberOfLines={1}>{inviteLink}</Text>
             </View>
-            
-            <TouchableOpacity onPress={handleCopyLink} style={styles.copyBtn} activeOpacity={0.85}>
-              <Text style={styles.copyIcon}>📋</Text>
-              <Text style={styles.copyBtnText}>Copy Link</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity onPress={handleShareInvite} style={styles.shareBtn} activeOpacity={0.85}>
-              <Text style={styles.shareIcon}>↗</Text>
-              <Text style={styles.shareBtnText}>More Share Options</Text>
-            </TouchableOpacity>
-          </View>
+            <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+              <Button label="Copy link" icon="copy-outline" style={{ flexGrow: 1 }} onPress={handleCopyLink} />
+              <Button label="Share…" icon="share-outline" kind="secondary" style={{ flexGrow: 1 }} onPress={handleShareInvite} />
+            </View>
+          </Card>
 
-          <TouchableOpacity onPress={handleStartWalk} activeOpacity={0.9} style={styles.startBtnWrapper}>
-            <LinearGradient 
-              colors={[colors.accent, '#8E4214']} 
-              start={{ x: 0, y: 0.5 }} 
-              end={{ x: 1, y: 0.5 }} 
-              style={styles.startBtn}
-            >
-              <Text style={styles.startBtnText}>Start Walking</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+          <Card style={{ gap: 12 }}>
+            <Text style={type.title}>2. Start walking</Text>
+            <Text style={type.small}>When your friends have opened the link, tap start. Everyone follows the same walk together.</Text>
+            <Button big label="Start walking" icon="play" onPress={handleStartWalk} />
+          </Card>
+
+          <Text style={[type.small, { color: ink.faint, textAlign: 'center' }]}>
+            Not ready yet? Close this screen. You’ll find the walk under “Your group walks” on the home screen.
+          </Text>
+        </ScrollView>
 
         {/* Share Modal */}
         <Modal
@@ -483,80 +475,99 @@ export default function StartGroupWalk() {
     );
   }
 
+  const userPlans = [...plans].sort((a: any, b: any) => Number(!!b.favourite) - Number(!!a.favourite));
+  const choices: any[] = [
+    ...(selectedPlan?.id === 'session-plan' ? [selectedPlan] : []),
+    ...userPlans,
+    ...PRESETS.map(presetPlan),
+  ];
+
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['rgba(242,166,90,0.2)', 'rgba(156,197,161,0.08)']} style={styles.bgGlow} />
-      
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.replace('/dashboard')} style={styles.iconBtn}>
-          <Text style={styles.iconText}>←</Text>
+    <View style={{ flex: 1, backgroundColor: ink.bg, width: '100%', maxWidth: 600, alignSelf: 'center' }}>
+      <View style={{ paddingTop: 48, paddingHorizontal: space.md, flexDirection: 'row', alignItems: 'center' }}>
+        <TouchableOpacity onPress={() => router.replace('/dashboard')} accessibilityRole="button" accessibilityLabel="Back to home"
+          style={{ minWidth: 48, minHeight: 48, justifyContent: 'center' }}>
+          <Ionicons name="chevron-back" size={28} color={ink.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{editId ? 'Edit Group Walk' : 'Start Group Walk'}</Text>
-        <View style={{ width: 36 }} />
+        <Text accessibilityRole="header" style={[type.label, { flex: 1, textAlign: 'center' }]}>{editId ? 'Edit group walk' : 'Walk together'}</Text>
+        <View style={{ width: 48 }} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
-        <View style={styles.section}>
-          <Text style={styles.label}>Walk Name</Text>
+      <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: 60, gap: space.lg }}>
+        {!editId ? (
+          <>
+            <View style={{ gap: 6 }}>
+              <Text style={type.display}>Walk with friends, wherever they are.</Text>
+              <Text style={type.body}>A group walk lets everyone follow the same walk at the same time. Nobody’s location is shared.</Text>
+            </View>
+
+            <Card style={{ gap: 14 }}>
+              <Text style={type.title}>How it works</Text>
+              {[
+                ['1', 'Choose a walk', 'Pick a ready-made walk or one of your own.'],
+                ['2', 'Invite friends', 'Share a private link. They join from anywhere.'],
+                ['3', 'Walk together', 'You start it, and everyone follows the same walk.'],
+              ].map(([n, h, d]) => (
+                <View key={n} style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: ink.ember, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={[type.label, { color: ink.emberInk, fontSize: 14 }]}>{n}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}><Text style={type.label}>{h}</Text><Text style={type.small}>{d}</Text></View>
+                </View>
+              ))}
+              <View style={{ flexDirection: 'row', gap: 10, padding: 12, borderRadius: round.sm, backgroundColor: 'rgba(156,197,161,0.1)' }}>
+                <Ionicons name="information-circle-outline" size={20} color={ink.moss} style={{ marginTop: 1 }} />
+                <Text style={[type.small, { flex: 1, color: ink.text }]}>
+                  Walks you create yourself are for walking on your own. To invite friends, create a group walk here.
+                </Text>
+              </View>
+            </Card>
+          </>
+        ) : null}
+
+        <View style={{ gap: 10 }}>
+          <Text style={type.title}>{editId ? 'Walk plan' : '1. Choose a walk'}</Text>
+          {choices.map((c: any) => {
+            const on = selectedPlan?.id === c.id;
+            const segs = segmentsFromIntervals(c.intervals);
+            const isPreset = String(c.id).startsWith('preset:');
+            const sub = `${isPreset ? c.blurb : c.id === 'session-plan' ? 'Current plan for this walk' : c.favourite ? '★ Your favourite' : 'Your walk'} · ${fmtMinutes(totalSeconds(segs))}`;
+            return (
+              <Card key={c.id} onPress={() => setSelectedPlan(c)} label={`${c.name}. ${sub}`}
+                style={{ gap: 10, borderColor: on ? ink.ember : ink.line, borderWidth: on ? 2 : 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Ionicons name={on ? 'radio-button-on' : 'radio-button-off'} size={22} color={on ? ink.ember : ink.faint} />
+                  <View style={{ flex: 1 }}><Text style={type.label}>{c.name}</Text><Text style={type.small}>{sub}</Text></View>
+                </View>
+                <Timeline segments={segs} height={20} />
+              </Card>
+            );
+          })}
+          <Button label="Create your own walk" icon="add" kind="secondary"
+            onPress={() => router.push({ pathname: '/create-walk', params: { returnTo: '/start-group-walk' } })} a11yHint="Build a walk, then come back here to use it" />
+        </View>
+
+        <View style={{ gap: 8 }}>
+          <Text nativeID="gwname" style={type.title}>{editId ? 'Name' : '2. Name it (optional)'}</Text>
           <TextInput
             value={sessionName}
             onChangeText={setSessionName}
-            placeholder="e.g. Morning Power Walk"
-            placeholderTextColor={colors.sub}
-            style={styles.input}
+            accessibilityLabelledBy="gwname"
+            maxLength={60}
+            placeholder={selectedPlan?.name || 'e.g. Morning walk with friends'}
+            placeholderTextColor={ink.faint}
+            style={{ minHeight: 54, borderRadius: round.sm, borderWidth: 1, borderColor: ink.line, color: ink.text, paddingHorizontal: 14, fontSize: 17, backgroundColor: 'rgba(0,0,0,0.2)' }}
           />
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Select Walk Plan</Text>
-          {plans.length === 0 ? (
-            <Text style={styles.emptyText}>No walk plans yet. Create one first!</Text>
-          ) : (
-            plans.map((plan) => (
-              <TouchableOpacity
-                key={plan.id}
-                onPress={() => setSelectedPlan(plan)}
-                style={[
-                  styles.planCard,
-                  selectedPlan?.id === plan.id && styles.planCardSelected
-                ]}
-                activeOpacity={0.7}
-              >
-                <View style={styles.planCardContent}>
-                  <Ionicons 
-                    name={selectedPlan?.id === plan.id ? "radio-button-on" : "radio-button-off"} 
-                    size={20} 
-                    color={selectedPlan?.id === plan.id ? colors.accent : colors.sub} 
-                  />
-                  <Text style={styles.planName}>{plan.name}</Text>
-                </View>
-                <Text style={styles.planIntervals}>
-                  {plan.intervals.length} intervals
-                </Text>
-              </TouchableOpacity>
-            ))
-          )}
+        <View style={{ gap: 8 }}>
+          <Button big label={editId ? 'Update group walk' : 'Create group walk'} icon={editId ? 'checkmark' : 'people'} onPress={handleCreateSession} />
+          {!editId ? <Text style={[type.small, { textAlign: 'center' }]}>Next you’ll get a private link to share with your friends.</Text> : null}
         </View>
-
-        <TouchableOpacity 
-          onPress={handleCreateSession} 
-          activeOpacity={0.9}
-          style={styles.createBtnWrapper}
-        >
-          <LinearGradient 
-            colors={[colors.accent, '#8E4214']} 
-            start={{ x: 0, y: 0.5 }} 
-            end={{ x: 1, y: 0.5 }} 
-            style={styles.createBtn}
-          >
-            <Text style={styles.createBtnText}>{editId ? 'Update Group Walk' : 'Create Session'}</Text>
-          </LinearGradient>
-        </TouchableOpacity>
       </ScrollView>
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: { width: '100%', maxWidth: 600, alignSelf: 'center',  flex: 1, backgroundColor: colors.bg },
   bgGlow: { display: 'none',  opacity: 0.3,  position: 'absolute', width: '120%', height: '120%', borderRadius: 999, left: -40, top: -60 },
