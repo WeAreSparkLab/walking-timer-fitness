@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { usePrefs } from '../../lib/spark/prefs';
 import { capabilities, chime, speak, unlockAudio } from '../../lib/walk/cues';
 import { useInstall, manualSteps } from '../../lib/install';
-import { ink, space } from '../../lib/spark/tokens';
+import { ink, phaseTone, round, space } from '../../lib/spark/tokens';
 import { Button, Card, Toggle, type } from './ui';
 
 export default function HomeSettings() {
@@ -76,6 +76,7 @@ export default function HomeSettings() {
 
       <Group title="Display and battery">
         <Toggle label="Bright light mode" value={prefs.brightMode} onChange={v => setPrefs({ brightMode: v })} note="Dark text on light during walks, for strong sunshine." />
+        <BrightPreview on={prefs.brightMode} />
         <Toggle label="Keep screen on during walks" value={prefs.keepAwake} onChange={v => setPrefs({ keepAwake: v })}
           note={caps.wakeLock ? undefined : 'Not supported in this browser.'} />
         <Toggle label="3D scenery" value={prefs.scene3d} onChange={v => setPrefs({ scene3d: v })} note="Switch off for the lighter 2D artwork." />
@@ -110,5 +111,22 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
       <Text accessibilityRole="header" style={[type.label, { color: ink.faint, textTransform: 'uppercase', letterSpacing: 1, fontSize: 13, marginBottom: 6 }]}>{title}</Text>
       {children}
     </Card>
+  );
+}
+
+/** Shows what the walk screen looks like with bright light mode on or off. */
+function BrightPreview({ on }: { on: boolean }) {
+  const bg = on ? '#FAF7F0' : ink.bg, fg = on ? '#121212' : ink.text, sub = on ? '#3B3A36' : ink.sub;
+  const tone = phaseTone.FAST, accent = on ? tone.light : tone.dark;
+  return (
+    <View accessible accessibilityLabel={on ? 'Preview: light background with dark text' : 'Preview: dark background with light text'}
+      style={{ marginVertical: 8, borderRadius: round.md, borderWidth: 1, borderColor: on ? 'rgba(0,0,0,0.15)' : ink.line, backgroundColor: bg, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+      <View style={{ width: 8, alignSelf: 'stretch', borderRadius: 4, backgroundColor: accent }} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: sub, fontSize: 12, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' }}>Preview · {on ? 'Bright' : 'Standard'}</Text>
+        <Text style={{ color: fg, fontSize: 17, fontWeight: '600' }}>Pick up the pace</Text>
+      </View>
+      <Text style={{ color: fg, fontSize: 34, fontWeight: '700', fontVariant: ['tabular-nums'] }}>1:00</Text>
+    </View>
   );
 }
