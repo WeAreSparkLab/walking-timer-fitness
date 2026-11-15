@@ -7,7 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabaseClient';
 import { getPlans, removePlan, WalkPlan } from '../lib/storage';
 import { getRecentActivities, getPeriodStats, Activity } from '../lib/api/stats';
-import { joinSession, deleteSession, leaveSession } from '../lib/api/sessions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { deleteSession, leaveSession } from '../lib/api/sessions';
+import { PENDING_JOIN_KEY } from '../lib/api/together';
 import { useMyProfile } from '../lib/useMyProfile';
 import { ensureMyProfile } from '../lib/api/profile';
 import { loadActiveWalk, ActiveWalk, elapsedMs } from '../lib/walk/engine';
@@ -23,7 +25,7 @@ import InstallNudge from '../components/spark/InstallNudge';
 import { WalkRow, GroupRow } from '../components/spark/WalkRows';
 
 type GroupWalk = { id: string; name: string | null; status: string; host_id: string; created_at: string; count: number };
-type Invite = { id: string; data: { session_id?: string; session_name?: string; host_name?: string } };
+type Invite = { id: string; data: { session_id?: string; session_name?: string; host_name?: string; link?: string; token?: string } };
 
 const ENCOURAGEMENT = [
   'A few minutes outside is always worth it.',
@@ -60,7 +62,11 @@ export default function Dashboard() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) router.replace('/');
-      else { setUserId(session.user.id); setAuthChecked(true); ensureMyProfile().catch(() => {}); }
+      else {
+        setUserId(session.user.id); setAuthChecked(true); ensureMyProfile().catch(() => {});
+        // Opened an invitation before signing in? Continue to it now.
+        AsyncStorage.getItem(PENDING_JOIN_KEY).then(t => { if (t) router.push(`/join/${t}`); }).catch(() => {});
+      }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!session) router.replace('/');
@@ -104,15 +110,13 @@ export default function Dashboard() {
     router.push(`/join/${token}`);
   };
 
+  // Invitations carry the secure link; joining goes through /join/<token>.
   const acceptInvite = async (inv: Invite) => {
-    if (!inv.data.session_id) return;
-    try {
-      await joinSession(inv.data.session_id);
-      await supabase.from('notifications').update({ read: true }).eq('id', inv.id);
-      router.push({ pathname: '/walk-timer', params: { sessionId: inv.data.session_id } });
-    } catch {
-      setInvites(v => v.filter(i => i.id !== inv.id));
-    }
+    const t = inv.data.token || inv.data.link?.match(/join\/([A-Za-z0-9_-]+)/)?.[1];
+    await supabase.from('notifications').update({ read: true }).eq('id', inv.id);
+    setInvites(v => v.filter(i => i.id !== inv.id));
+    if (t) router.push(`/join/${t}`);
+    else { setJoinOpen(true); setJoinError('That invitation is from an older version. Ask the host to send a new one.'); }
   };
   const dismissInvite = async (inv: Invite) => {
     setInvites(v => v.filter(i => i.id !== inv.id));
@@ -162,7 +166,7 @@ export default function Dashboard() {
 
         {/* Together */}
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <Card style={{ flex: 1, gap: 8, minHeight: 128 }} onPress={() => router.push('/start-group-walk')} label="Walk together: create a group walk and invite friends">
+          <Card style={{ flex: 1, gap: 8, minHeight: 128 }} onPress={() => router.push('/together/new')} label="Walk together: create a group walk and invite friends">
             <Ionicons name="people-outline" size={26} color={ink.moss} />
             <Text style={type.label}>Walk together</Text>
             <Text style={type.small}>Create a group walk and invite friends</Text>
@@ -241,11 +245,11 @@ export default function Dashboard() {
         {/* Group walks */}
         {groups.length ? (
           <Collapsible title={`Your group walks (${groups.length})`} storageKey="sparkwalk.home.groupWalks"
-            action={<Button label="New" icon="add" kind="quiet" onPress={() => router.push('/start-group-walk')} style={{ minHeight: 48, paddingHorizontal: 8 }} />}>
+            action={<Button label="New" icon="add" kind="quiet" onPress={() => router.push('/together/new')} style={{ minHeight: 48, paddingHorizontal: 8 }} />}>
             {groups.slice(0, 5).map(g => (
               <GroupRow key={g.id} name={g.name || 'Group walk'} isHost={g.host_id === userId}
                 sub={`${g.host_id === userId ? 'You’re hosting' : 'Joined'} · ${g.count} ${g.count === 1 ? 'walker' : 'walkers'}`}
-                onOpen={() => router.push({ pathname: '/walk-timer', params: { sessionId: g.id } })}
+                onOpen={() => router.push(`/together/${g.id}`)}
                 onRemove={async () => {
                   try {
                     if (g.host_id === userId) await deleteSession(g.id); else await leaveSession(g.id);
