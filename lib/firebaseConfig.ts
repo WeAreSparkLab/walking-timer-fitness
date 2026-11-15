@@ -18,8 +18,13 @@ const app = initializeApp(firebaseConfig);
 let messaging: Messaging | null = null;
 
 if (typeof window !== 'undefined') {
-  messaging = getMessaging(app);
+  try {
+    messaging = getMessaging(app);
+  } catch (e) {
+    console.error('Firebase Messaging init failed:', e);
+  }
 }
 
-export { messaging, getMessaging as getToken, onMessage } from 'firebase/messaging';
+export { messaging };
+export { getToken, onMessage } from 'firebase/messaging';
 export default app;

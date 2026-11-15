@@ -3,6 +3,68 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
 
+/**
+ * Obtain a short-lived Google OAuth2 access token for the FCM v1 API
+ * by constructing and signing a JWT with the service account's private key.
+ */
+async function getFCMAccessToken(serviceAccount: {
+  client_email: string
+  private_key: string
+}): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  const header = { alg: 'RS256', typ: 'JWT' }
+  const claimSet = {
+    iss: serviceAccount.client_email,
+    sub: serviceAccount.client_email,
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+  }
+
+  const encode = (obj: object) =>
+    btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+
+  const signingInput = `${encode(header)}.${encode(claimSet)}`
+
+  const keyPem = serviceAccount.private_key
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\n/g, '')
+
+  const keyBytes = Uint8Array.from(atob(keyPem), (c) => c.charCodeAt(0))
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    keyBytes,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+
+  const sigBytes = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    cryptoKey,
+    new TextEncoder().encode(signingInput)
+  )
+
+  const signature = btoa(String.fromCharCode(...new Uint8Array(sigBytes)))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+
+  const jwt = `${signingInput}.${signature}`
+
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+  })
+
+  const tokenData = await tokenRes.json()
+  if (!tokenData.access_token) {
+    throw new Error(`Failed to get FCM access token: ${JSON.stringify(tokenData)}`)
+  }
+  return tokenData.access_token
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -137,6 +199,83 @@ serve(async (req) => {
       } catch (expoError) {
         console.error('Expo push failed:', expoError)
       }
+    }
+
+    // 5. Send FCM push notification (HTTP v1 API) to all web browser tokens for this user
+    const fcmServiceAccountRaw = Deno.env.get('FCM_SERVICE_ACCOUNT_KEY')
+    if (fcmServiceAccountRaw) {
+      const { data: fcmRows, error: fcmError } = await supabase
+        .from('fcm_tokens')
+        .select('token')
+        .eq('user_id', userId)
+
+      if (fcmError) {
+        console.error('Failed to fetch FCM tokens:', fcmError)
+      } else if (fcmRows && fcmRows.length > 0) {
+        const tokens = fcmRows.map((r: { token: string }) => r.token)
+        console.log(`📲 Sending FCM v1 to ${tokens.length} token(s)`)
+
+        try {
+          const serviceAccount = JSON.parse(fcmServiceAccountRaw)
+          const accessToken = await getFCMAccessToken(serviceAccount)
+          const projectId: string = serviceAccount.project_id
+
+          for (const token of tokens) {
+            try {
+              const fcmResponse = await fetch(
+                `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    message: {
+                      token,
+                      notification: { title, body },
+                      webpush: {
+                        notification: {
+                          title,
+                          body,
+                          icon: '/icon-192.png',
+                          badge: '/icon-192.png',
+                          requireInteraction: false,
+                        },
+                        fcm_options: { link: '/' },
+                      },
+                      // FCM data values must all be strings
+                      data: Object.fromEntries(
+                        Object.entries(data || {}).map(([k, v]) => [k, String(v)])
+                      ),
+                    },
+                  }),
+                }
+              )
+
+              if (!fcmResponse.ok) {
+                const errText = await fcmResponse.text()
+                if (fcmResponse.status === 404 || fcmResponse.status === 410) {
+                  console.error('❌ Stale FCM token, removing:', token.substring(0, 20))
+                  await supabase.from('fcm_tokens').delete().eq('token', token)
+                } else {
+                  console.error('❌ FCM v1 send error:', fcmResponse.status, errText)
+                }
+              } else {
+                console.log('✅ FCM v1 sent to token:', token.substring(0, 20))
+              }
+            } catch (fcmSendError) {
+              console.error('❌ FCM send error for token:', fcmSendError)
+            }
+          }
+        } catch (parseError) {
+          console.error('❌ Failed to parse FCM_SERVICE_ACCOUNT_KEY:', parseError)
+        }
+      } else {
+        console.log('ℹ️ No FCM tokens found for user')
+      }
+    } else {
+      console.log('ℹ️ FCM_SERVICE_ACCOUNT_KEY not configured - skipping FCM delivery')
     }
 
     return new Response(
