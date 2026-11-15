@@ -106,6 +106,11 @@ begin
   return t;
 end $$;
 
+-- Only signed-in users may call these (by default Postgres also lets signed-out visitors).
+revoke execute on function public.server_now(), public.start_walk(uuid, int), public.pause_walk(uuid),
+  public.resume_walk(uuid), public.preview_invite(text), public.redeem_invite(text), public.rotate_invite(uuid)
+  from public, anon;
+
 grant execute on function public.server_now(), public.start_walk(uuid, int), public.pause_walk(uuid),
   public.resume_walk(uuid), public.preview_invite(text), public.redeem_invite(text), public.rotate_invite(uuid)
   to authenticated;
