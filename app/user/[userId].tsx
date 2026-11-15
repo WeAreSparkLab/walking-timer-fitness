@@ -19,7 +19,6 @@ type UserProfile = {
   id: string;
   username: string | null;
   avatar_url: string | null;
-  email: string | null;
 };
 
 type FriendStatus = 'none' | 'pending_sent' | 'pending_received' | 'friends';
@@ -64,7 +63,7 @@ export default function UserProfilePage() {
       // Load profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, username, avatar_url, email')
+        .select('id, username, avatar_url')
         .eq('id', userId)
         .single();
 

@@ -11,7 +11,7 @@ import {
   startTogether, pauseTogether, resumeTogether, setReady, leaveTogether, cancelTogether, markCompleted, subscribeTogether, getMessagesSince,
 } from '../../lib/api/together';
 import { sendMessage, subscribeMessages, Message } from '../../lib/api/messages';
-import { listMyFriends } from '../../lib/api/friends';
+import { listMyFriends, getFriendStatuses, sendFriendRequest, respondToFriendRequest, FriendState } from '../../lib/api/friends';
 import { sendNotificationToUser } from '../../lib/api/notifications';
 import { recordWalkActivity } from '../../lib/api/stats';
 import { syncServerClock, sharedElapsedMs, serverNow } from '../../lib/walk/sharedClock';
@@ -55,6 +55,8 @@ export default function TogetherScreen() {
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
+  const [walkersOpen, setWalkersOpen] = useState(false);
+  const [friendStates, setFriendStates] = useState<Record<string, FriendState>>({});
   const [chatText, setChatText] = useState('');
   const [chatSeen, setChatSeen] = useState<string>(() => new Date().toISOString());
   const msgsRef = useRef<Message[]>([]);
@@ -252,6 +254,32 @@ export default function TogetherScreen() {
     if (!ok) setNotice(`Couldn’t notify ${f.username}. You can share the link instead.`);
   };
 
+  // ---- friends: add people you meet on a walk ----
+  const walkerKey = walkers.map(w => w.user_id).sort().join(',');
+  useEffect(() => {
+    if (!me || !walkerKey) return;
+    getFriendStatuses(walkerKey.split(',').filter(id => id !== me.id)).then(setFriendStates).catch(() => {});
+  }, [walkerKey, me?.id]);
+  const addFriend = async (id: string) => {
+    setFriendStates(s => ({ ...s, [id]: { status: 'pending_sent' } }));
+    try {
+      const f = await sendFriendRequest(id);
+      setFriendStates(s => ({ ...s, [id]: { status: 'pending_sent', friendshipId: f.id } }));
+    } catch {
+      setFriendStates(s => ({ ...s, [id]: { status: 'none' } }));
+      setNotice('Couldn’t send the friend request. Please try again.');
+    }
+  };
+  const acceptFriend = async (id: string) => {
+    const fid = friendStates[id]?.friendshipId;
+    if (!fid) return;
+    try { await respondToFriendRequest(fid, 'accepted'); setFriendStates(s => ({ ...s, [id]: { status: 'friends', friendshipId: fid } })); }
+    catch { setNotice('Couldn’t accept the request. Please try again.'); }
+  };
+  const friendFor = (w: Walker) => (me && w.user_id !== me.id
+    ? <FriendButton name={w.username || 'this walker'} state={friendStates[w.user_id]?.status ?? 'none'} onAdd={() => addFriend(w.user_id)} onAccept={() => acceptFriend(w.user_id)} />
+    : null);
+
   // ---- chat ----
   const nameOf = (m: Message) => m.sender?.username || walkers.find(w => w.user_id === m.sender_id)?.username || 'Walker';
   const unread = messages.filter(m => m.sender_id !== me?.id && String(m.created_at) > chatSeen).length;
@@ -302,7 +330,7 @@ export default function TogetherScreen() {
           <Text style={type.body}>{fmtMinutes(total)} of “{session.name || 'your walk'}”, side by side from wherever you were.</Text>
           <Card style={{ gap: 12 }}>
             <Text style={type.eyebrow}>Walking together</Text>
-            {walkers.map(w => <WalkerRow key={w.user_id} w={w} host={w.user_id === session.host_id} you={w.user_id === me.id} />)}
+            {walkers.map(w => <WalkerRow key={w.user_id} w={w} host={w.user_id === session.host_id} you={w.user_id === me.id} friend={friendFor(w)} />)}
           </Card>
           <Card style={{ gap: 10 }}>
             <Text style={type.label}>Say thanks</Text>
@@ -334,7 +362,7 @@ export default function TogetherScreen() {
               <Text style={type.label}>Walkers</Text>
               <Text style={type.small}>{readyCount} of {walkers.length} ready</Text>
             </View>
-            {walkers.map(w => <WalkerRow key={w.user_id} w={w} host={w.user_id === session.host_id} you={w.user_id === me.id} online={online.includes(w.user_id)} lobby />)}
+            {walkers.map(w => <WalkerRow key={w.user_id} w={w} host={w.user_id === session.host_id} you={w.user_id === me.id} online={online.includes(w.user_id)} lobby friend={friendFor(w)} />)}
           </Card>
 
           <Card style={{ gap: 10 }}>
@@ -406,12 +434,21 @@ export default function TogetherScreen() {
         ) : null}
 
         {/* Together indicator: who is here, nothing about where */}
-        <View accessible accessibilityLabel={`${togetherCount} of ${walkers.length} walkers connected`} style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Pressable onPress={() => setWalkersOpen(o => !o)} accessibilityRole="button" accessibilityState={{ expanded: walkersOpen }}
+          accessibilityLabel={`${togetherCount} of ${walkers.length} walkers connected. Tap to see who is here and add friends.`}
+          style={{ marginTop: 12, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={{ flexDirection: 'row' }}>
             {walkers.slice(0, 5).map((w, i) => <Avatar key={w.user_id} w={w} size={28} dim={!online.includes(w.user_id)} style={{ marginLeft: i ? -8 : 0 }} />)}
           </View>
-          <Text style={type.small}>{togetherCount} walking together</Text>
-        </View>
+          <Text style={[type.small, { flex: 1 }]}>{togetherCount} walking together</Text>
+          <Ionicons name={walkersOpen ? 'chevron-up' : 'chevron-down'} size={18} color={ink.sub} />
+        </Pressable>
+        {walkersOpen ? (
+          <Card style={{ gap: 6, marginTop: 4 }}>
+            <Text style={type.small}>Tap “Add friend” to stay in touch after the walk.</Text>
+            {walkers.map(w => <WalkerRow key={w.user_id} w={w} host={w.user_id === session.host_id} you={w.user_id === me.id} online={online.includes(w.user_id)} friend={friendFor(w)} />)}
+          </Card>
+        ) : null}
         {!hostOnline && !isHost ? <Text style={[type.small, { marginTop: 6 }]}>{hostName}’s connection dropped. The walk carries on for everyone.</Text> : null}
         {conn === 'offline' ? <Text style={[type.small, { marginTop: 6, color: ink.ember }]}>You’re offline. Your timer keeps going and catches up when you reconnect.</Text> : null}
 
@@ -491,7 +528,20 @@ function Avatar({ w, size, dim, style }: { w: Walker; size: number; dim?: boolea
   );
 }
 
-function WalkerRow({ w, host, you, online, lobby }: { w: Walker; host: boolean; you: boolean; online?: boolean; lobby?: boolean }) {
+/** Add friend / Request sent / Accept / Friends, for one walker. */
+function FriendButton({ name, state, onAdd, onAccept }: { name: string; state: FriendState['status']; onAdd: () => void; onAccept: () => void }) {
+  if (state === 'friends') return <View accessible accessibilityLabel={`You and ${name} are friends`} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="heart" size={14} color={ink.moss} /><Text style={type.small}>Friends</Text></View>;
+  if (state === 'pending_sent') return <Text accessibilityLabel={`Friend request sent to ${name}`} style={type.small}>Friend request sent</Text>;
+  const accept = state === 'pending_received';
+  return (
+    <Pressable onPress={accept ? onAccept : onAdd} accessibilityRole="button" accessibilityLabel={accept ? `Accept ${name}’s friend request` : `Add ${name} as a friend`}
+      style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+      <Text style={[type.small, { color: ink.ember, fontWeight: '700', textDecorationLine: 'underline' }]}>{accept ? 'Accept friend request' : 'Add friend'}</Text>
+    </Pressable>
+  );
+}
+
+function WalkerRow({ w, host, you, online, lobby, friend }: { w: Walker; host: boolean; you: boolean; online?: boolean; lobby?: boolean; friend?: React.ReactNode }) {
   const name = `${w.username || 'Walker'}${you ? ' (you)' : ''}`;
   const state = lobby ? `${w.ready || host ? 'ready' : 'not ready yet'}${online === false ? ', not connected' : ''}` : '';
   return (
@@ -500,6 +550,7 @@ function WalkerRow({ w, host, you, online, lobby }: { w: Walker; host: boolean; 
       <View style={{ flex: 1 }}>
         <Text style={type.label}>{name}</Text>
         {host ? <Text style={type.small}>Host</Text> : null}
+        {friend}
       </View>
       {lobby ? (
         w.ready || host

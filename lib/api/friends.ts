@@ -221,3 +221,26 @@ export async function cancelFriendRequest(friendshipId: string): Promise<void> {
 
   if (error) throw error;
 }
+
+export type FriendState = { status: 'none' | 'pending_sent' | 'pending_received' | 'friends'; friendshipId?: string };
+
+/** Your friendship status with several people at once (for example, everyone on a walk). */
+export async function getFriendStatuses(otherIds: string[]): Promise<Record<string, FriendState>> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || otherIds.length === 0) return {};
+  const wanted = new Set(otherIds);
+  const { data, error } = await supabase
+    .from('friendships')
+    .select('*')
+    .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`)
+    .limit(500);
+  if (error) throw error;
+  const out: Record<string, FriendState> = {};
+  for (const f of data || []) {
+    const other = f.requester_id === user.id ? f.addressee_id : f.requester_id;
+    if (!wanted.has(other)) continue;
+    if (f.status === 'accepted') out[other] = { status: 'friends', friendshipId: f.id };
+    else if (f.status === 'pending') out[other] = { status: f.requester_id === user.id ? 'pending_sent' : 'pending_received', friendshipId: f.id };
+  }
+  return out;
+}
