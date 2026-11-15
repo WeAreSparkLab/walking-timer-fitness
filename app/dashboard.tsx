@@ -278,17 +278,17 @@ export default function Dashboard() {
 
         {/* World picker */}
         <Section title="Your walking world">
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 }}>
             {[...WORLDS, SIMPLE_WORLD].map(w => {
               const on = prefs.world === w.id;
               return (
                 <Pressable key={w.id} onPress={() => setPrefs({ world: w.id })} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`${w.name}. ${w.line}`}
-                  style={{ flexGrow: 1, flexBasis: 150, maxWidth: '48.5%' as any, borderRadius: round.md, overflow: 'hidden', borderWidth: 2, borderColor: on ? ink.ember : ink.line }}>
-                  <View style={{ height: 96 }}><Scenery world={w} still /></View>
+                  style={{ width: '48%', borderRadius: round.md, overflow: 'hidden', borderWidth: 2, borderColor: on ? ink.ember : ink.line }}>
+                  <View style={{ height: 80 }}><Scenery world={w} still /></View>
                   <View style={{ padding: 10, backgroundColor: ink.cardSolid, minHeight: 64 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       {on ? <Ionicons name="checkmark-circle" size={16} color={ink.ember} /> : null}
-                      <Text style={[type.label, { fontSize: 14 }]} numberOfLines={1}>{w.name}</Text>
+                      <Text style={[type.label, { fontSize: 14, flexShrink: 1 }]} numberOfLines={2}>{w.name}</Text>
                     </View>
                     <Text style={[type.small, { fontSize: 13 }]} numberOfLines={2}>{w.line}</Text>
                   </View>

@@ -34,7 +34,7 @@ export default function DirectChat() {
         
         // Show notification for new message (only if from friend, not from me)
         if (profile?.id && message.sender_id !== profile.id) {
-          const senderName = message.sender?.username || message.sender?.email || 'Someone';
+          const senderName = message.sender?.username || 'Someone';
           await notifyDirectMessage(senderName, message.text, friendId);
         }
       }
@@ -132,9 +132,9 @@ export default function DirectChat() {
                 </View>
                 {isMe && (
                   <View style={[styles.messageAvatar, styles.messageAvatarMe]}>
-                    {profile?.avatarUrl ? (
+                    {profile?.avatar_url ? (
                       <Image 
-                        source={{ uri: profile.avatarUrl }} 
+                        source={{ uri: profile.avatar_url }} 
                         style={styles.avatarImage}
                       />
                     ) : (
@@ -182,7 +182,7 @@ export default function DirectChat() {
 
 const styles = StyleSheet.create({
   container: { width: '100%', maxWidth: 600, alignSelf: 'center',  flex: 1, backgroundColor: colors.bg },
-  bgGlow: { display: 'none',  opacity: 0.3,  position: 'absolute' as any, top: 0, left: 0, right: 0, height: 400, opacity: 0.3 },
+  bgGlow: { display: 'none', position: 'absolute' as any, top: 0, left: 0, right: 0, height: 400, opacity: 0.3 },
   
   header: {
     flexDirection: 'row',

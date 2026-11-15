@@ -49,12 +49,12 @@ export default function Friends() {
           // Get requester's profile for notification
           const { data: requesterProfile } = await supabase
             .from('profiles')
-            .select('username, email')
+            .select('username')
             .eq('id', payload.new.requester_id)
             .single();
-          
+
           if (requesterProfile) {
-            const username = requesterProfile.username || requesterProfile.email || 'Someone';
+            const username = requesterProfile.username || 'Someone';
             await notifyFriendRequest(username);
           }
         }
@@ -104,23 +104,43 @@ export default function Friends() {
     }
   };
 
+  // Messages shown on the page (Alert.alert does nothing in a web browser).
+  const [notice, setNotice] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
+
+  // People are found by the START of a username (3+ letters) or a COMPLETE email address.
+  // Emails are never returned or shown, and there is no partial-email search.
   const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    
+    const q = searchQuery.trim();
+    setNotice(null);
+    if (q.length < 3) {
+      setSearchResults([]);
+      setNotice({ kind: 'info', text: 'Type at least 3 letters of a username, or someone’s full email address.' });
+      return;
+    }
+
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url, email')
-        .or(`username.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
-        .neq('id', profile?.id)
-        .limit(20);
-      
-      if (error) throw error;
-      setSearchResults(data || []);
+      const { data, error } = await supabase.rpc('find_people', { p_query: q });
+      if (error && (error.code === 'PGRST202' || /find_people/i.test(error.message))) {
+        // The email search isn't switched on yet: fall back to usernames only.
+        const safe = q.replace(/[%_,()\\]/g, '');
+        const fallback = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .ilike('username', `${safe}%`)
+          .neq('id', profile?.id ?? '')
+          .limit(20);
+        if (fallback.error) throw fallback.error;
+        setSearchResults(fallback.data || []);
+        if (q.includes('@')) setNotice({ kind: 'info', text: 'Searching by email isn’t available yet. Try their username.' });
+      } else if (error) {
+        throw error;
+      } else {
+        setSearchResults(data || []);
+      }
     } catch (error) {
       console.error('Search error:', error);
-      Alert.alert('Error', 'Failed to search users');
+      setNotice({ kind: 'error', text: 'Couldn’t search just now. Check your connection and try again.' });
     } finally {
       setLoading(false);
     }
@@ -130,10 +150,10 @@ export default function Friends() {
     try {
       await sendFriendRequest(userId);
       setSentRequests(prev => new Set([...prev, userId]));
-      Alert.alert('Success', 'Friend request sent!');
+      setNotice({ kind: 'info', text: 'Friend request sent.' });
     } catch (error: any) {
       console.error('Add friend error:', error);
-      Alert.alert('Error', error.message || 'Failed to send request');
+      setNotice({ kind: 'error', text: /duplicate|already/i.test(error?.message || '') ? 'You’ve already sent a request to this person.' : 'Couldn’t send the request. Please try again.' });
     }
   };
 
@@ -232,7 +252,7 @@ export default function Friends() {
                       <Image source={{ uri: friend.avatar_url }} style={styles.avatarImage} />
                     ) : (
                       <Text style={styles.userAvatarText}>
-                        {(friend.username || friend.email || 'U')[0].toUpperCase()}
+                        {(friend.username || 'U')[0].toUpperCase()}
                       </Text>
                     )}
                   </View>
@@ -264,22 +284,31 @@ export default function Friends() {
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Search by username or email..."
+                placeholder="Username, or a full email address"
                 placeholderTextColor={colors.sub}
                 style={styles.searchInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+                accessibilityLabel="Find a friend by username or full email address"
                 onSubmitEditing={handleSearch}
               />
-              <TouchableOpacity onPress={handleSearch} style={styles.searchBtn}>
+              <TouchableOpacity onPress={handleSearch} style={styles.searchBtn} accessibilityRole="button" accessibilityLabel="Search">
                 <Text style={styles.searchIcon}>🔍</Text>
               </TouchableOpacity>
             </View>
+            <Text style={{ color: colors.sub, fontSize: 13, marginBottom: 10 }}>
+              Type the start of a username (3 letters or more), or a complete email address. Email addresses are never shown to anyone.
+            </Text>
+            {notice ? (
+              <Text accessibilityLiveRegion="polite" style={{ color: notice.kind === 'error' ? colors.danger : colors.text, marginBottom: 10, fontSize: 14 }}>{notice.text}</Text>
+            ) : null}
 
             {loading ? (
               <Text style={styles.loadingText}>Searching...</Text>
-            ) : searchResults.length === 0 && searchQuery ? (
+            ) : searchResults.length === 0 && searchQuery.trim().length >= 3 && !notice ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyIcon}>🔍</Text>
-                <Text style={styles.emptyText}>No users found</Text>
+                <Text style={styles.emptyText}>No one found. Check the spelling, or try their full email address.</Text>
               </View>
             ) : (
               searchResults
@@ -302,7 +331,7 @@ export default function Friends() {
                           <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
                         ) : (
                           <Text style={styles.userAvatarText}>
-                            {(user.username || user.email || 'U')[0].toUpperCase()}
+                            {(user.username || 'U')[0].toUpperCase()}
                           </Text>
                         )}
                       </View>
