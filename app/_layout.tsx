@@ -5,7 +5,7 @@ import { colors } from '../lib/theme';
 import { useEffect } from 'react';
 import { addNotificationResponseListener } from '../lib/notifications';
 import type { NotificationResponse } from 'expo-notifications';
-import InstallPrompt from '../lib/InstallPrompt';
+import '../lib/install'; // starts listening for the browser's install event right away
 import { startAnalytics } from '../lib/analytics';
 import { Platform } from 'react-native';
 import { requestNotificationPermission } from '../lib/webNotifications';
@@ -39,7 +39,7 @@ export default function RootLayout() {
       // Add theme color
       const themeColor = document.createElement('meta');
       themeColor.name = 'theme-color';
-      themeColor.content = '#B4561C';
+      themeColor.content = '#0D1310';
       document.head.appendChild(themeColor);
       
       // Add apple touch icon
@@ -157,7 +157,6 @@ export default function RootLayout() {
         <Stack.Screen name="create-walk" />
         <Stack.Screen name="profile" />
       </Stack>
-      <InstallPrompt />
     </>
   );
 }
