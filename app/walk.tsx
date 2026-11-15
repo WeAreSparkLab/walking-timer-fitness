@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ink, phaseTone, round, space } from '../lib/spark/tokens';
 import { usePrefs } from '../lib/spark/prefs';
 import { getWorld } from '../lib/spark/worlds';
-import { Button, Card, PhaseIcon, Timeline, type, useSparkFonts } from '../components/spark/ui';
+import { Button, Card, PhaseIcon, Timeline, Toggle, LIGHT_TOGGLE, type, useSparkFonts } from '../components/spark/ui';
 import Scenery from '../components/spark/Scenery';
 import Scenery3D from '../components/spark/Scenery3D';
 import { PRESETS, PHASE_COPY, Segment, buildSegments, fmtClock, fmtMinutes, segmentsFromIntervals, totalSeconds } from '../lib/walk/schedule';
@@ -254,6 +254,7 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
           {!started ? (
             <>
               <Button big label="Start walk" icon="play" onPress={onStart} a11yHint="Starts the timer with your chosen cues" />
+              <Toggle label="Bright light mode" value={prefs.brightMode} onChange={v => setPrefs({ brightMode: v })} palette={light ? LIGHT_TOGGLE : undefined} note="Light screen with dark text, for strong sunshine." />
               <Button label="Sound and display settings" icon="options-outline" kind="quiet" onPress={() => router.push({ pathname: '/dashboard', params: { section: 'settings' } })}
                 tone={light ? { bg: 'transparent', fg: '#121212' } : undefined} a11yHint="Opens settings on the home screen" />
             </>
