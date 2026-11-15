@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad, radius, shadow } from '../lib/theme';
@@ -12,6 +12,9 @@ export default function LoginScreen() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [forgot, setForgot] = useState(false);
+  // Inline messages: Alert.alert does nothing in a web browser.
+  const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
   const router = useRouter();
 
   // Check if user is already logged in
@@ -31,18 +34,19 @@ export default function LoginScreen() {
   const handleAuth = async () => {
     // Validation
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
+      setMessage({ kind: 'error', text: 'Please enter your email.' });
       return;
     }
     if (!validateEmail(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      setMessage({ kind: 'error', text: 'That doesn’t look like an email address. Please check it.' });
       return;
     }
     if (!password || password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      setMessage({ kind: 'error', text: 'Your password needs at least 6 characters.' });
       return;
     }
 
+    setMessage(null);
     setLoading(true);
     try {
       if (isSignUp) {
@@ -57,14 +61,12 @@ export default function LoginScreen() {
         if (data.user) {
           // Check if email confirmation is required
           if (data.user.identities && data.user.identities.length === 0) {
-            Alert.alert('Account Exists', 'This email is already registered. Please sign in instead.');
+            setMessage({ kind: 'info', text: 'This email already has an account. Please sign in, or tap “Forgot your password?” if you need to reset it.' });
             setIsSignUp(false);
           } else {
-            Alert.alert(
-              'Success!',
-              'Account created successfully! Please check your email to verify your account.',
-              [{ text: 'OK', onPress: () => setIsSignUp(false) }]
-            );
+            setMessage({ kind: 'info', text: 'Account created! Please check your email to confirm it, then sign in.' });
+            setIsSignUp(false);
+
           }
         }
       } else {
@@ -83,12 +85,43 @@ export default function LoginScreen() {
         }
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Authentication failed');
+      const raw = String(error?.message || '');
+      setMessage({
+        kind: 'error',
+        text: /invalid login credentials/i.test(raw)
+          ? 'That email and password don’t match. You can try again, or tap “Forgot your password?”.'
+          : /email not confirmed/i.test(raw)
+            ? 'Please confirm your email first. Check your inbox for the link we sent.'
+            : raw || 'Something went wrong. Please try again.',
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleReset = async () => {
+    const addr = email.trim().toLowerCase();
+    if (!validateEmail(addr)) {
+      setMessage({ kind: 'error', text: 'Enter the email you signed up with, and we’ll send you a link.' });
+      return;
+    }
+    setMessage(null);
+    setLoading(true);
+    try {
+      const origin = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : 'https://walks.wearesparklab.com';
+      const { error } = await supabase.auth.resetPasswordForEmail(addr, { redirectTo: `${origin}/reset-password` });
+      if (error && /rate limit|only request this once|seconds/i.test(error.message)) {
+        setMessage({ kind: 'error', text: 'We’ve only just sent one. Please wait a minute and check your inbox (and spam) before trying again.' });
+      } else {
+        // Same message whether or not the email has an account, so nobody can use this to find out who has one.
+        setMessage({ kind: 'info', text: 'If there’s an account for that email, we’ve sent a link to reset your password. It can take a few minutes, so check your spam folder too.' });
+      }
+    } catch {
+      setMessage({ kind: 'error', text: 'Couldn’t send the email. Check your connection and try again.' });
+    } finally {
+      setLoading(false);
+    }
+  };
   if (checkingSession) {
     return (
       <View style={[styles.container, { justifyContent: 'center' }]}>
@@ -115,11 +148,17 @@ export default function LoginScreen() {
       <View style={[styles.card, shadow.card]}>
         <Text style={styles.title}>Spark Walk</Text>
         <Text style={styles.subtitle}>
-          {isSignUp ? 'Create your account' : 'Intervals made easy.'}
+          {forgot ? 'Reset your password' : isSignUp ? 'Create your account' : 'Intervals made easy.'}
         </Text>
 
+        {forgot ? (
+          <Text style={[styles.subtitle, { marginTop: -10, color: colors.text }]}>
+            Enter your email and we’ll send you a link to choose a new password.
+          </Text>
+        ) : null}
+
         <View style={styles.field}>
-          <Text style={styles.label}>Email</Text>
+          <Text nativeID="loginEmailLabel" style={styles.label}>Email</Text>
           <TextInput
             value={email}
             onChangeText={setEmail}
@@ -127,28 +166,50 @@ export default function LoginScreen() {
             placeholderTextColor={colors.sub}
             style={styles.input}
             autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
             keyboardType="email-address"
+            accessibilityLabelledBy="loginEmailLabel"
+            onSubmitEditing={forgot ? handleReset : undefined}
             editable={!loading}
           />
         </View>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder="At least 6 characters"
-            placeholderTextColor={colors.sub}
-            secureTextEntry
-            style={styles.input}
-            editable={!loading}
-          />
-        </View>
+        {!forgot ? (
+          <View style={styles.field}>
+            <Text nativeID="loginPasswordLabel" style={styles.label}>Password</Text>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="At least 6 characters"
+              placeholderTextColor={colors.sub}
+              secureTextEntry
+              style={styles.input}
+              autoComplete={isSignUp ? 'new-password' : 'current-password'}
+              accessibilityLabelledBy="loginPasswordLabel"
+              onSubmitEditing={handleAuth}
+              editable={!loading}
+            />
+            {!isSignUp ? (
+              <TouchableOpacity onPress={() => { setForgot(true); setMessage(null); }} disabled={loading} accessibilityRole="button" style={styles.forgotBtn}>
+                <Text style={styles.forgotText}>Forgot your password?</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
 
-        <TouchableOpacity 
-          onPress={handleAuth} 
+        {message ? (
+          <View accessibilityLiveRegion="polite" accessibilityRole={message.kind === 'error' ? 'alert' : undefined}
+            style={[styles.msg, message.kind === 'error' ? styles.msgError : styles.msgInfo]}>
+            <Text style={styles.msgText}>{message.text}</Text>
+          </View>
+        ) : null}
+
+        <TouchableOpacity
+          onPress={forgot ? handleReset : handleAuth}
           activeOpacity={0.9}
           disabled={loading}
+          accessibilityRole="button"
         >
           <LinearGradient
             colors={[colors.accent, '#8E4214']}
@@ -160,25 +221,33 @@ export default function LoginScreen() {
               <ActivityIndicator size="small" color={colors.text} />
             ) : (
               <Text style={styles.ctaText}>
-                {isSignUp ? 'Create Account' : 'Sign In'}
+                {forgot ? 'Send reset link' : isSignUp ? 'Create Account' : 'Sign In'}
               </Text>
             )}
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => setIsSignUp(!isSignUp)}
-          style={styles.switchBtn}
-          disabled={loading}
-        >
-          <Text style={styles.switchText}>
-            {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-            <Text style={styles.switchTextBold}>
-              {isSignUp ? 'Sign In' : 'Sign Up'}
+        {forgot ? (
+          <TouchableOpacity onPress={() => { setForgot(false); setMessage(null); }} style={styles.switchBtn} disabled={loading} accessibilityRole="button">
+            <Text style={styles.switchText}>
+              Remembered it? <Text style={styles.switchTextBold}>Back to sign in</Text>
             </Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={() => { setIsSignUp(!isSignUp); setMessage(null); }}
+            style={styles.switchBtn}
+            disabled={loading}
+            accessibilityRole="button"
+          >
+            <Text style={styles.switchText}>
+              {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+              <Text style={styles.switchTextBold}>
+                {isSignUp ? 'Sign In' : 'Sign Up'}
+              </Text>
+            </Text>
+          </TouchableOpacity>
+        )}      </View>
     </View>
   );
 }
@@ -203,4 +272,10 @@ const styles = StyleSheet.create({
   switchBtn: { marginTop: 20, alignItems: 'center' },
   switchText: { color: colors.sub, fontSize: 14 },
   switchTextBold: { color: colors.text, fontWeight: '700' },
+  forgotBtn: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', marginTop: 4 },
+  forgotText: { color: colors.text, fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
+  msg: { borderRadius: radius.md, padding: 14, marginBottom: 6, borderWidth: 1 },
+  msgError: { backgroundColor: 'rgba(255,138,122,0.10)', borderColor: 'rgba(255,138,122,0.5)' },
+  msgInfo: { backgroundColor: 'rgba(156,197,161,0.12)', borderColor: 'rgba(156,197,161,0.5)' },
+  msgText: { color: colors.text, fontSize: 14, lineHeight: 20 },
 });
