@@ -162,7 +162,7 @@ export default function Dashboard() {
           <Card style={{ flex: 1, gap: 8, minHeight: 128 }} onPress={() => router.push('/start-group-walk')} label="Walk together: create a group walk and invite friends">
             <Ionicons name="people-outline" size={26} color={ink.moss} />
             <Text style={type.label}>Walk together</Text>
-            <Text style={type.small}>Invite friends, wherever they are</Text>
+            <Text style={type.small}>Create a group walk and invite friends</Text>
           </Card>
           <Card style={{ flex: 1, gap: 8, minHeight: 128 }} onPress={() => setJoinOpen(o => !o)} label="Join a friend’s walk with an invitation link">
             <Ionicons name="link-outline" size={26} color={ink.moss} />
@@ -219,7 +219,7 @@ export default function Dashboard() {
         ) : null}
 
         {/* Walks */}
-        <Section title="Choose a walk" action={{ label: 'Create', icon: 'add', onPress: () => router.push('/create-walk') }}>
+        <Section title="Choose a walk (just for you)" action={{ label: 'Create', icon: 'add', onPress: () => router.push('/create-walk') }}>
           {sortedPlans.map(p => {
             const segs = segmentsFromIntervals(p.intervals);
             return <WalkRow key={p.id} name={p.name} sub={`${p.favourite ? '★ Favourite' : 'Your plan'} · ${fmtMinutes(totalSeconds(segs))}`} segs={segs}
@@ -231,7 +231,7 @@ export default function Dashboard() {
             return <WalkRow key={p.id} name={p.name} sub={`${p.blurb} · ${fmtMinutes(totalSeconds(segs))}`} segs={segs}
               onPress={() => router.push({ pathname: '/walk', params: { preset: p.id } })} />;
           })}
-          <Text style={[type.small, { color: ink.faint }]}>Ready-made walks are examples, not medical advice. Go at a pace that feels comfortable.</Text>
+          <Text style={[type.small, { color: ink.faint }]}>These are for walking on your own. To walk with friends, tap Walk together to create a group walk. Ready-made walks are examples, not medical advice, so go at a pace that feels comfortable.</Text>
         </Section>
 
         {/* Group walks */}

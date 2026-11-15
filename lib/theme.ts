@@ -12,8 +12,8 @@ export const colors = {
   danger: '#FF8A7A',
 };
 
-export const radius = { lg: 26, md: 18, sm: 12 };
-export const pad = { xl: 28, lg: 22, md: 16, sm: 12 };
+export const radius = { xl: 32, lg: 26, md: 18, sm: 12 };
+export const pad = { xl: 28, lg: 22, md: 16, sm: 12, xs: 6 };
 
 export const shadow = {
   card: {
