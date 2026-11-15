@@ -121,22 +121,26 @@ export function subscribeTogether(
     status: (s: 'connected' | 'connecting' | 'offline') => void;
   }
 ) {
-  const ch = supabase.channel(`together:${sessionId}`, { config: { presence: { key: me.id } } });
-  ch.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` },
-    p => on.session(p.new as TogetherSession));
-  ch.on('postgres_changes', { event: '*', schema: 'public', table: 'session_participants', filter: `session_id=eq.${sessionId}` },
-    () => on.walkersChanged());
-  ch.on('presence', { event: 'sync' }, () => on.presence(Object.keys(ch.presenceState())));
+  // Two separate channels, so a problem with one never takes down the other:
+  //  - timeline: instant updates when the host starts, pauses or resumes
+  //  - presence: who currently has the walk open
+  // (The walker list is not broadcast by the database; the regular refresh keeps it current.)
+  const timeline = supabase.channel(`together-timeline:${sessionId}`);
+  timeline.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions', filter: `id=eq.${sessionId}` },
+    p => { on.session(p.new as TogetherSession); on.walkersChanged(); });
   on.status('connecting');
-  ch.subscribe(async status => {
-    if (status === 'SUBSCRIBED') {
-      on.status('connected');
-      try { await ch.track({ username: me.username }); } catch {}
-    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-      on.status('offline');
-    }
+  timeline.subscribe(status => {
+    if (status === 'SUBSCRIBED') on.status('connected');
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') on.status('offline');
   });
-  return () => { supabase.removeChannel(ch); };
+
+  const presence = supabase.channel(`together-presence:${sessionId}`, { config: { presence: { key: me.id } } });
+  presence.on('presence', { event: 'sync' }, () => on.presence(Object.keys(presence.presenceState())));
+  presence.subscribe(async status => {
+    if (status === 'SUBSCRIBED') { try { await presence.track({ username: me.username }); } catch {} }
+  });
+
+  return () => { supabase.removeChannel(timeline); supabase.removeChannel(presence); };
 }
 
 /** Chat messages newer than `after` (ISO). Used as a safety net next to live delivery. */
