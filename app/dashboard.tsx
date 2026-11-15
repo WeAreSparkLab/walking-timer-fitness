@@ -2,7 +2,7 @@
 // (The previous dashboard was retired; /classic-dashboard redirects here.)
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, Pressable, TextInput, Image, ActivityIndicator, Platform } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabaseClient';
 import { getPlans, WalkPlan } from '../lib/storage';
@@ -17,6 +17,8 @@ import { ink, round, space } from '../lib/spark/tokens';
 import { Button, Card, Timeline, Toggle, type, useSparkFonts } from '../components/spark/ui';
 import Scenery from '../components/spark/Scenery';
 import Scenery3D from '../components/spark/Scenery3D';
+import HomeSettings from '../components/spark/HomeSettings';
+import InstallNudge from '../components/spark/InstallNudge';
 
 type GroupWalk = { id: string; name: string | null; status: string; host_id: string; created_at: string; count: number };
 type Invite = { id: string; data: { session_id?: string; session_name?: string; host_name?: string } };
@@ -45,6 +47,12 @@ export default function Dashboard() {
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const { section } = useLocalSearchParams<{ section?: string }>();
+  useEffect(() => {
+    if (section !== 'settings' || !authChecked || Platform.OS !== 'web') return;
+    const t = setTimeout(() => document.getElementById('settings')?.scrollIntoView({ behavior: 'smooth' }), 500);
+    return () => clearTimeout(t);
+  }, [section, authChecked]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -179,6 +187,8 @@ export default function Dashboard() {
           <Button label="Profile" icon="person-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/profile')} />
         </View>
 
+        <InstallNudge onHowTo={() => document.getElementById('settings')?.scrollIntoView({ behavior: 'smooth' })} />
+
         {/* Invitations */}
         {invites.map(inv => (
           <Card key={inv.id} style={{ gap: 10 }}>
@@ -276,9 +286,9 @@ export default function Dashboard() {
             })}
           </View>
           <Text style={[type.small, { color: ink.faint }]}>Worlds are scenery for the app, not maps of where you are.</Text>
-          <Toggle label="3D scenery" value={prefs.scene3d} onChange={v => setPrefs({ scene3d: v })} note="Switch off for the lighter 2D artwork." />
-          <Toggle label="Low-power mode" value={prefs.lowPower} onChange={v => setPrefs({ lowPower: v })} note="Turns off scenery and animation to save battery." />
         </Section>
+
+        <HomeSettings />
 
         <Text style={[type.small, { color: ink.faint, textAlign: 'center' }]}>Your pace. Your path. Better together.</Text>
       </View>
