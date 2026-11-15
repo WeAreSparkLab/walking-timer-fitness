@@ -5,9 +5,9 @@ import { View, Text, ScrollView, Pressable, TextInput, Image, ActivityIndicator,
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabaseClient';
-import { getPlans, WalkPlan } from '../lib/storage';
+import { getPlans, removePlan, WalkPlan } from '../lib/storage';
 import { getRecentActivities, getPeriodStats, Activity } from '../lib/api/stats';
-import { joinSession } from '../lib/api/sessions';
+import { joinSession, deleteSession, leaveSession } from '../lib/api/sessions';
 import { useMyProfile } from '../lib/useMyProfile';
 import { ensureMyProfile } from '../lib/api/profile';
 import { loadActiveWalk, ActiveWalk, elapsedMs } from '../lib/walk/engine';
@@ -20,6 +20,7 @@ import Scenery from '../components/spark/Scenery';
 import Scenery3D from '../components/spark/Scenery3D';
 import HomeSettings from '../components/spark/HomeSettings';
 import InstallNudge from '../components/spark/InstallNudge';
+import { WalkRow, GroupRow } from '../components/spark/WalkRows';
 
 type GroupWalk = { id: string; name: string | null; status: string; host_id: string; created_at: string; count: number };
 type Invite = { id: string; data: { session_id?: string; session_name?: string; host_name?: string } };
@@ -43,6 +44,7 @@ export default function Dashboard() {
   const [recent, setRecent] = useState<Activity[] | null>(null);
   const [weekSeconds, setWeekSeconds] = useState(0);
   const [groups, setGroups] = useState<GroupWalk[]>([]);
+  const [groupError, setGroupError] = useState<string | null>(null);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [joinOpen, setJoinOpen] = useState(false);
   const [joinCode, setJoinCode] = useState('');
@@ -225,7 +227,8 @@ export default function Dashboard() {
             const segs = segmentsFromIntervals(p.intervals);
             return <WalkRow key={p.id} name={p.name} sub={`${p.favourite ? '★ Favourite' : 'Your plan'} · ${fmtMinutes(totalSeconds(segs))}`} segs={segs}
               onPress={() => router.push({ pathname: '/walk', params: { planId: p.id } })}
-              onEdit={() => router.push({ pathname: '/create-walk', params: { editId: p.id } })} />;
+              onEdit={() => router.push({ pathname: '/create-walk', params: { editId: p.id } })}
+              onDelete={async () => { await removePlan(p.id); setPlans(await getPlans()); }} />;
           })}
           {PRESETS.map(p => {
             const segs = buildSegments(p.structure);
@@ -239,17 +242,19 @@ export default function Dashboard() {
         {groups.length ? (
           <Collapsible title={`Your group walks (${groups.length})`} storageKey="sparkwalk.home.groupWalks"
             action={<Button label="New" icon="add" kind="quiet" onPress={() => router.push('/start-group-walk')} style={{ minHeight: 48, paddingHorizontal: 8 }} />}>
-            {groups.slice(0, 3).map(g => (
-              <Card key={g.id} onPress={() => router.push({ pathname: '/walk-timer', params: { sessionId: g.id } })} label={`Open group walk ${g.name || ''}`}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 }}>
-                <Ionicons name={g.host_id === userId ? 'star-outline' : 'people-outline'} size={22} color={ink.moss} />
-                <View style={{ flex: 1 }}>
-                  <Text style={type.label} numberOfLines={1}>{g.name || 'Group walk'}</Text>
-                  <Text style={type.small}>{g.host_id === userId ? 'You’re hosting' : 'Joined'} · {g.count} {g.count === 1 ? 'walker' : 'walkers'}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={ink.sub} />
-              </Card>
+            {groups.slice(0, 5).map(g => (
+              <GroupRow key={g.id} name={g.name || 'Group walk'} isHost={g.host_id === userId}
+                sub={`${g.host_id === userId ? 'You’re hosting' : 'Joined'} · ${g.count} ${g.count === 1 ? 'walker' : 'walkers'}`}
+                onOpen={() => router.push({ pathname: '/walk-timer', params: { sessionId: g.id } })}
+                onRemove={async () => {
+                  try {
+                    if (g.host_id === userId) await deleteSession(g.id); else await leaveSession(g.id);
+                    setGroupError(null);
+                    setGroups(prev => prev.filter(x => x.id !== g.id));
+                  } catch { setGroupError('Couldn’t do that just now. Check your connection and try again.'); }
+                }} />
             ))}
+            {groupError ? <Text accessibilityLiveRegion="polite" style={[type.small, { color: ink.danger }]}>{groupError}</Text> : null}
           </Collapsible>
         ) : null}
 
@@ -307,27 +312,6 @@ function Section({ title, action, children }: { title: string; action?: { label:
       </View>
       {children}
     </View>
-  );
-}
-
-function WalkRow({ name, sub, segs, onPress, onEdit }: { name: string; sub: string; segs: any[]; onPress: () => void; onEdit?: () => void }) {
-  return (
-    <Card onPress={onPress} label={`Start ${name}. ${sub}`} style={{ gap: 12 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={type.label}>{name}</Text>
-          <Text style={type.small}>{sub}</Text>
-        </View>
-        {onEdit ? (
-          <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel={`Edit ${name}`} hitSlop={8}
-            style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="create-outline" size={20} color={ink.sub} />
-          </Pressable>
-        ) : null}
-        <Ionicons name="play-circle" size={34} color={ink.ember} />
-      </View>
-      <Timeline segments={segs} height={22} />
-    </Card>
   );
 }
 
