@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient';
+import { ensureMyProfile } from './profile';
 
 export type Pace = 'WARMUP' | 'FAST' | 'SLOW' | 'COOLDOWN';
 export type IntervalDTO = { pace: Pace; minutes: number; seconds: number };
@@ -19,6 +20,7 @@ export type Session = {
 export async function createSession(name: string, plan: IntervalDTO[]) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
+  await ensureMyProfile(); // hosting needs a profile row
 
   const { data, error } = await supabase
     .from('sessions')
@@ -252,6 +254,7 @@ export function subscribeToSessionControl(sessionId: string, onChange: (data: { 
 export async function joinSession(sessionId: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
+  await ensureMyProfile(); // joining needs a profile row
 
   // Check if already a participant
   const { data: existing } = await supabase

@@ -7,7 +7,7 @@ import { colors, pad, radius } from '../lib/theme';
 import { getPlans } from '../lib/storage';
 import { PRESETS, buildSegments, intervalsFromSegments, segmentsFromIntervals, totalSeconds, fmtMinutes } from '../lib/walk/schedule';
 import { ink, round, space } from '../lib/spark/tokens';
-import { Button, Card, Timeline, type, useSparkFonts } from '../components/spark/ui';
+import { Button, Card, Collapsible, Timeline, type, useSparkFonts } from '../components/spark/ui';
 
 // Ready-made walks, in the same shape as a saved plan so the rest of this screen treats them alike.
 const presetPlan = (p: (typeof PRESETS)[number]) => ({ id: `preset:${p.id}`, name: p.name, blurb: p.blurb, intervals: intervalsFromSegments(buildSegments(p.structure)) });
@@ -502,7 +502,7 @@ export default function StartGroupWalk() {
             </View>
 
             <Card style={{ gap: 14 }}>
-              <Text style={type.title}>How it works</Text>
+              <Collapsible title="How it works" storageKey="sparkwalk.gw.howItWorks">
               {[
                 ['1', 'Choose a walk', 'Pick a ready-made walk or one of your own.'],
                 ['2', 'Invite friends', 'Share a private link. They join from anywhere.'],
@@ -521,6 +521,7 @@ export default function StartGroupWalk() {
                   Walks you create yourself are for walking on your own. To invite friends, create a group walk here.
                 </Text>
               </View>
+              </Collapsible>
             </Card>
           </>
         ) : null}

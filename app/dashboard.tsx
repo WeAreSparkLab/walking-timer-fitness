@@ -9,12 +9,13 @@ import { getPlans, WalkPlan } from '../lib/storage';
 import { getRecentActivities, getPeriodStats, Activity } from '../lib/api/stats';
 import { joinSession } from '../lib/api/sessions';
 import { useMyProfile } from '../lib/useMyProfile';
+import { ensureMyProfile } from '../lib/api/profile';
 import { loadActiveWalk, ActiveWalk, elapsedMs } from '../lib/walk/engine';
 import { PRESETS, buildSegments, segmentsFromIntervals, totalSeconds, fmtMinutes, fmtClock } from '../lib/walk/schedule';
 import { usePrefs, prefersReducedMotion } from '../lib/spark/prefs';
 import { WORLDS, SIMPLE_WORLD, getWorld } from '../lib/spark/worlds';
 import { ink, round, space } from '../lib/spark/tokens';
-import { Button, Card, Timeline, Toggle, type, useSparkFonts } from '../components/spark/ui';
+import { Button, Card, Collapsible, Timeline, Toggle, type, useSparkFonts } from '../components/spark/ui';
 import Scenery from '../components/spark/Scenery';
 import Scenery3D from '../components/spark/Scenery3D';
 import HomeSettings from '../components/spark/HomeSettings';
@@ -57,7 +58,7 @@ export default function Dashboard() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) router.replace('/');
-      else { setUserId(session.user.id); setAuthChecked(true); }
+      else { setUserId(session.user.id); setAuthChecked(true); ensureMyProfile().catch(() => {}); }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       if (!session) router.replace('/');
@@ -236,7 +237,8 @@ export default function Dashboard() {
 
         {/* Group walks */}
         {groups.length ? (
-          <Section title="Your group walks" action={{ label: 'New', icon: 'add', onPress: () => router.push('/start-group-walk') }}>
+          <Collapsible title={`Your group walks (${groups.length})`} storageKey="sparkwalk.home.groupWalks"
+            action={<Button label="New" icon="add" kind="quiet" onPress={() => router.push('/start-group-walk')} style={{ minHeight: 48, paddingHorizontal: 8 }} />}>
             {groups.slice(0, 3).map(g => (
               <Card key={g.id} onPress={() => router.push({ pathname: '/walk-timer', params: { sessionId: g.id } })} label={`Open group walk ${g.name || ''}`}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 }}>
@@ -248,7 +250,7 @@ export default function Dashboard() {
                 <Ionicons name="chevron-forward" size={20} color={ink.sub} />
               </Card>
             ))}
-          </Section>
+          </Collapsible>
         ) : null}
 
         {/* Recent */}

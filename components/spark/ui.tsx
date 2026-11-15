@@ -1,5 +1,6 @@
 // components/spark/ui.tsx — shared Spark Walk primitives
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pressable, Text, View, Platform, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ink, fonts, round, space, phaseTone } from '../../lib/spark/tokens';
@@ -115,5 +116,37 @@ export function Toggle({ label, value, onChange, note, palette = DARK_TOGGLE }: 
       </View>
       <Text style={[type.small, { width: 28, color: palette.sub }]}>{value ? 'On' : 'Off'}</Text>
     </Pressable>
+  );
+}
+
+/**
+ * A heading that opens and closes its content. Not hidden forever: the heading
+ * stays, and the choice is remembered on this device.
+ */
+export function Collapsible({ title, storageKey, defaultOpen = true, action, children }: {
+  title: string; storageKey: string; defaultOpen?: boolean; action?: React.ReactNode; children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => {
+    AsyncStorage.getItem(storageKey).then(v => { if (v === 'open') setOpen(true); else if (v === 'closed') setOpen(false); }).catch(() => {});
+  }, [storageKey]);
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    AsyncStorage.setItem(storageKey, next ? 'open' : 'closed').catch(() => {});
+  };
+  return (
+    <View style={{ gap: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Pressable onPress={toggle} accessibilityRole="button" accessibilityState={{ expanded: open }}
+          accessibilityLabel={`${title}. ${open ? 'Open' : 'Closed'}. Tap to ${open ? 'close' : 'open'}.`}
+          style={{ flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={type.title}>{title}</Text>
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} color={ink.sub} />
+        </Pressable>
+        {open ? action : null}
+      </View>
+      {open ? children : null}
+    </View>
   );
 }
