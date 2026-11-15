@@ -2,14 +2,15 @@
 // Timing comes from server timestamps on the session row, so every walker
 // sees the same phase, including after reloads, late joins and lost signal.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Image, Share, Platform, useWindowDimensions, AppState } from 'react-native';
+import { View, Text, TextInput, ScrollView, Pressable, Image, Share, Platform, useWindowDimensions, AppState } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabaseClient';
 import {
   TogetherSession, Walker, getTogether, getWalkers, getInviteToken, rotateInvite, inviteLink, fetchServerNow,
-  startTogether, pauseTogether, resumeTogether, setReady, leaveTogether, cancelTogether, markCompleted, subscribeTogether,
+  startTogether, pauseTogether, resumeTogether, setReady, leaveTogether, cancelTogether, markCompleted, subscribeTogether, getMessagesSince,
 } from '../../lib/api/together';
+import { sendMessage, subscribeMessages, Message } from '../../lib/api/messages';
 import { listMyFriends } from '../../lib/api/friends';
 import { sendNotificationToUser } from '../../lib/api/notifications';
 import { recordWalkActivity } from '../../lib/api/stats';
@@ -52,6 +53,12 @@ export default function TogetherScreen() {
   const [friends, setFriends] = useState<{ id: string; username: string }[]>([]);
   const [invited, setInvited] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatText, setChatText] = useState('');
+  const [chatSeen, setChatSeen] = useState<string>(() => new Date().toISOString());
+  const msgsRef = useRef<Message[]>([]);
+  msgsRef.current = messages;
 
   const isHost = !!(me && session && me.id === session.host_id);
   const segments: Segment[] = useMemo(() => segmentsFromIntervals((session?.plan as any) || []), [session?.plan]);
@@ -68,6 +75,34 @@ export default function TogetherScreen() {
 
   // ---- load ----
   const reloadWalkers = useCallback(() => getWalkers(sid).then(setWalkers).catch(() => {}), [sid]);
+
+  // New messages are merged by id, so live delivery and the safety-net refresh never double up.
+  const addMessages = useCallback((incoming: Message[]) => {
+    setMessages(prev => {
+      const seen = new Set(prev.map(m => m.id));
+      const fresh = incoming.filter(m => !seen.has(m.id));
+      return fresh.length ? [...prev, ...fresh].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))) : prev;
+    });
+  }, []);
+
+  // One refresh does everything: the walk's timeline, who is here, and new chat messages.
+  // It runs when live updates arrive, when you come back to the app, and every few seconds
+  // as a safety net, so nothing depends on a single live connection staying up.
+  const refresh = useCallback(async () => {
+    try {
+      const s = await getTogether(sid);
+      setSession(prev => ({ ...(prev as TogetherSession), ...s }));
+      const last = msgsRef.current.length ? msgsRef.current[msgsRef.current.length - 1].created_at : null;
+      const [w, m] = await Promise.all([getWalkers(sid), getMessagesSince(sid, last)]);
+      setWalkers(w);
+      if (m.length) addMessages(m);
+      setNow(serverNow());
+      setConn('connected');
+    } catch (e: any) {
+      if (e?.code === 'PGRST116') setError('This walk has ended or was cancelled by the host.');
+      else setConn('offline');
+    }
+  }, [sid, addMessages]);
   useEffect(() => {
     let unsub: (() => void) | undefined;
     (async () => {
@@ -86,24 +121,36 @@ export default function TogetherScreen() {
         return;
       }
       reloadWalkers();
-      unsub = subscribeTogether(sid, meNow, {
+      getMessagesSince(sid, null).then(addMessages).catch(() => {});
+      const unsubMsgs = subscribeMessages(sid, m => addMessages([m]));
+      const unsubTogether = subscribeTogether(sid, meNow, {
         session: s => setSession(prev => ({ ...(prev as TogetherSession), ...s })),
-        walkersChanged: reloadWalkers,
+        walkersChanged: refresh,
         presence: setOnline,
-        status: setConn,
+        status: s => setConn(c => (s === 'offline' && c === 'connected' ? c : s)),
       });
+      unsub = () => { unsubMsgs(); unsubTogether(); };
     })();
     return () => unsub?.();
   }, [sid]);
 
   // Catch up after the app was in the background or signal returned.
   useEffect(() => {
-    const refresh = () => { getTogether(sid).then(setSession).catch(() => {}); reloadWalkers(); setNow(serverNow()); };
     const sub = AppState.addEventListener('change', s => s === 'active' && refresh());
     const onOnline = () => refresh();
     if (typeof window !== 'undefined') window.addEventListener('online', onOnline);
     return () => { sub.remove(); if (typeof window !== 'undefined') window.removeEventListener('online', onOnline); };
-  }, [sid]);
+  }, [refresh]);
+
+  // Safety net: check in every few seconds while the screen is visible (slower during a walk).
+  useEffect(() => {
+    if (!me || error) return;
+    const t = setInterval(() => { if (isVisible()) refresh(); }, started && !finished ? 5000 : 3000);
+    return () => clearInterval(t);
+  }, [me, error, started, finished, refresh]);
+
+  // Opening the chat marks everything as read.
+  useEffect(() => { if (chatOpen) setChatSeen(new Date().toISOString()); }, [chatOpen, messages.length]);
 
   // Removed by host, or walk deleted.
   useEffect(() => {
@@ -205,6 +252,18 @@ export default function TogetherScreen() {
     if (!ok) setNotice(`Couldn’t notify ${f.username}. You can share the link instead.`);
   };
 
+  // ---- chat ----
+  const nameOf = (m: Message) => m.sender?.username || walkers.find(w => w.user_id === m.sender_id)?.username || 'Walker';
+  const unread = messages.filter(m => m.sender_id !== me?.id && String(m.created_at) > chatSeen).length;
+  const send = async () => {
+    const text = chatText.trim();
+    if (!text) return;
+    setChatText('');
+    try { addMessages([await sendMessage(sid, text)]); }
+    catch { setChatText(text); setNotice('Couldn’t send your message. Check your connection.'); }
+  };
+  const chat = <ChatPanel messages={messages} meId={me?.id ?? ''} nameOf={nameOf} text={chatText} setText={setChatText} onSend={send} />;
+
   // ---- render ----
   if (error) {
     return (
@@ -245,6 +304,10 @@ export default function TogetherScreen() {
             <Text style={type.eyebrow}>Walking together</Text>
             {walkers.map(w => <WalkerRow key={w.user_id} w={w} host={w.user_id === session.host_id} you={w.user_id === me.id} />)}
           </Card>
+          <Card style={{ gap: 10 }}>
+            <Text style={type.label}>Say thanks</Text>
+            {chat}
+          </Card>
           <Button label="Back to home" onPress={() => router.replace('/dashboard')} />
         </ScrollView>
       </View>
@@ -272,6 +335,11 @@ export default function TogetherScreen() {
               <Text style={type.small}>{readyCount} of {walkers.length} ready</Text>
             </View>
             {walkers.map(w => <WalkerRow key={w.user_id} w={w} host={w.user_id === session.host_id} you={w.user_id === me.id} online={online.includes(w.user_id)} lobby />)}
+          </Card>
+
+          <Card style={{ gap: 10 }}>
+            <Text style={type.label}>Chat</Text>
+            {chat}
           </Card>
 
           {!isHost ? (
@@ -387,6 +455,8 @@ export default function TogetherScreen() {
               : <Button label="Pause just me" icon="pause-outline" kind="secondary" onPress={() => setMine(m => ({ ...m, pausedAt: serverNow() }))} a11yHint="Others keep walking. You can catch up any time." />
           ) : null}
           {meStepped && !groupPaused ? <Text style={[type.small, { textAlign: 'center' }]}>Others are still walking. Catching up takes you to where they are now.</Text> : null}
+          <Button label={unread ? `Chat (${unread} new)` : 'Chat'} icon="chatbubbles-outline" kind="secondary" onPress={() => setChatOpen(o => !o)} a11yHint="Messages stay quiet while you walk" />
+          {chatOpen ? <Card style={{ gap: 10 }}>{chat}</Card> : null}
           {notice ? <Text accessibilityLiveRegion="polite" style={[type.small, { color: ink.ember }]}>{notice}</Text> : null}
           <LeaveOrCancel isHost={isHost} confirm={confirm} setConfirm={setConfirm} walking
             onLeave={() => leaveTogether(sid).then(() => router.replace('/dashboard'))}
@@ -456,4 +526,31 @@ function LeaveOrCancel({ isHost, confirm, setConfirm, onLeave, onCancel, walking
     );
   }
   return <Button label={isHost ? (walking ? 'End walk for everyone' : 'Cancel walk') : 'Leave walk'} kind="quiet" icon="exit-outline" onPress={() => setConfirm(kind)} />;
+}
+
+function ChatPanel({ messages, meId, nameOf, text, setText, onSend }: {
+  messages: Message[]; meId: string; nameOf: (m: Message) => string; text: string; setText: (t: string) => void; onSend: () => void;
+}) {
+  const shown = messages.slice(-30);
+  return (
+    <View style={{ gap: 10 }}>
+      <ScrollView style={{ maxHeight: 260 }} contentContainerStyle={{ gap: 8 }} nestedScrollEnabled>
+        {shown.length === 0 ? <Text style={type.small}>No messages yet. Say hello to your walking group.</Text> : shown.map(m => {
+          const mine = m.sender_id === meId;
+          return (
+            <View key={m.id} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '85%', padding: 10, borderRadius: round.md, backgroundColor: mine ? 'rgba(242,166,90,0.16)' : 'rgba(246,241,231,0.08)' }}>
+              {!mine ? <Text style={[type.small, { color: ink.moss, fontWeight: '600' }]}>{nameOf(m)}</Text> : null}
+              <Text style={[type.body, { color: ink.text }]}>{m.text}</Text>
+            </View>
+          );
+        })}
+      </ScrollView>
+      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+        <TextInput value={text} onChangeText={setText} onSubmitEditing={onSend} placeholder="Write a message" placeholderTextColor={ink.faint} maxLength={500}
+          accessibilityLabel="Message to the group"
+          style={{ flex: 1, minHeight: 48, borderRadius: round.sm, borderWidth: 1, borderColor: ink.line, color: ink.text, paddingHorizontal: 12, fontSize: 16, backgroundColor: 'rgba(0,0,0,0.2)' }} />
+        <Button label="Send" icon="send" onPress={onSend} disabled={!text.trim()} style={{ minHeight: 48, paddingHorizontal: 14 }} />
+      </View>
+    </View>
+  );
 }

@@ -1,6 +1,8 @@
 // lib/api/together.ts — Walk Together v2 (needs supabase/proposed/walk_together_v2.sql)
 import { supabase } from '../supabaseClient';
 import type { IntervalDTO } from './sessions';
+import { ensureMyProfile } from './profile';
+import type { Message } from './messages';
 
 export type TogetherSession = {
   id: string;
@@ -34,6 +36,7 @@ export async function fetchServerNow(): Promise<string> {
 export async function createTogetherWalk(name: string, plan: IntervalDTO[]) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Please sign in first.');
+  await ensureMyProfile(); // hosting needs a profile row
   const { data, error } = await supabase.from('sessions').insert({ host_id: user.id, name, plan, status: 'scheduled' }).select().single();
   if (error) throw error;
   const { error: pErr } = await supabase.from('session_participants').insert({ session_id: data.id, user_id: user.id, ready: true });
@@ -73,7 +76,10 @@ export const rotateInvite = (sessionId: string) => rpc<string>('rotate_invite', 
 export const startTogether = (sessionId: string, countdown = 10) => rpc<TogetherSession>('start_walk', { p_session: sessionId, p_countdown_seconds: countdown });
 export const pauseTogether = (sessionId: string) => rpc<TogetherSession>('pause_walk', { p_session: sessionId });
 export const resumeTogether = (sessionId: string) => rpc<TogetherSession>('resume_walk', { p_session: sessionId });
-export const redeemInvite = (token: string) => rpc<string>('redeem_invite', { p_token: token });
+export const redeemInvite = async (token: string) => {
+  await ensureMyProfile(); // joining needs a profile row
+  return rpc<string>('redeem_invite', { p_token: token });
+};
 
 export async function previewInvite(token: string): Promise<InvitePreview | null> {
   const rows = await rpc<InvitePreview[]>('preview_invite', { p_token: token });
@@ -131,4 +137,13 @@ export function subscribeTogether(
     }
   });
   return () => { supabase.removeChannel(ch); };
+}
+
+/** Chat messages newer than `after` (ISO). Used as a safety net next to live delivery. */
+export async function getMessagesSince(sessionId: string, after: string | null): Promise<Message[]> {
+  let q = supabase.from('session_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true }).limit(200);
+  if (after) q = q.gt('created_at', after);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data || []) as Message[];
 }

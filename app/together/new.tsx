@@ -7,7 +7,7 @@ import { getPlans, WalkPlan } from '../../lib/storage';
 import { createTogetherWalk } from '../../lib/api/together';
 import { PRESETS, buildSegments, intervalsFromSegments, segmentsFromIntervals, totalSeconds, fmtMinutes, Segment } from '../../lib/walk/schedule';
 import { ink, round, space } from '../../lib/spark/tokens';
-import { Button, Card, Timeline, type, useSparkFonts } from '../../components/spark/ui';
+import { Button, Card, Collapsible, Timeline, type, useSparkFonts } from '../../components/spark/ui';
 
 type Choice = { key: string; name: string; segs: Segment[]; sub: string };
 
@@ -20,7 +20,13 @@ export default function NewTogether() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { getPlans().then(setPlans); }, []);
+  useEffect(() => {
+    getPlans().then(ps => {
+      setPlans(ps);
+      const first = [...ps].sort((a, b) => Number(!!b.favourite) - Number(!!a.favourite))[0];
+      if (first) setPick(`plan:${first.id}`);
+    });
+  }, []);
 
   const choices: Choice[] = [
     ...[...plans].sort((a, b) => Number(!!b.favourite) - Number(!!a.favourite)).map(p => {
@@ -57,8 +63,30 @@ export default function NewTogether() {
           <Text style={type.display}>Walk with friends, wherever they are.</Text>
           <Text style={type.body}>Everyone follows the same walk at the same moment. Nobody’s location is shared.</Text>
         </View>
+        <Card style={{ gap: 14 }}>
+          <Collapsible title="How it works" storageKey="sparkwalk.gw.howItWorks">
+            {[
+              ['1', 'Choose a walk', 'Pick a ready-made walk or one of your own.'],
+              ['2', 'Invite friends', 'Share a private link. They join from anywhere.'],
+              ['3', 'Walk together', 'You start it, and everyone follows the same walk.'],
+            ].map(([n, h, d]) => (
+              <View key={n} style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: ink.ember, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={[type.label, { color: ink.emberInk, fontSize: 14 }]}>{n}</Text>
+                </View>
+                <View style={{ flex: 1 }}><Text style={type.label}>{h}</Text><Text style={type.small}>{d}</Text></View>
+              </View>
+            ))}
+            <View style={{ flexDirection: 'row', gap: 10, padding: 12, borderRadius: round.sm, backgroundColor: 'rgba(156,197,161,0.1)' }}>
+              <Ionicons name="information-circle-outline" size={20} color={ink.moss} style={{ marginTop: 1 }} />
+              <Text style={[type.small, { flex: 1, color: ink.text }]}>
+                Walks you create yourself are for walking on your own. To invite friends, create a group walk here.
+              </Text>
+            </View>
+          </Collapsible>
+        </Card>
         <View style={{ gap: 10 }}>
-          <Text style={type.label}>Choose a walk</Text>
+          <Text style={type.title}>1. Choose a walk</Text>
           {choices.map(c => {
             const on = c.key === chosen?.key;
             return (
@@ -72,9 +100,11 @@ export default function NewTogether() {
               </Card>
             );
           })}
+          <Button label="Create your own walk" icon="add" kind="secondary"
+            onPress={() => router.push({ pathname: '/create-walk', params: { returnTo: '/together/new' } })} a11yHint="Build a walk, then come back here to use it" />
         </View>
         <View style={{ gap: 8 }}>
-          <Text nativeID="tname" style={type.label}>Name (optional)</Text>
+          <Text nativeID="tname" style={type.title}>2. Name it (optional)</Text>
           <TextInput value={name} onChangeText={setName} accessibilityLabelledBy="tname" maxLength={60}
             placeholder={chosen?.name || 'Walk together'} placeholderTextColor={ink.faint}
             style={{ minHeight: 54, borderRadius: round.sm, borderWidth: 1, borderColor: ink.line, color: ink.text, paddingHorizontal: 14, fontSize: 17, backgroundColor: 'rgba(0,0,0,0.2)' }} />

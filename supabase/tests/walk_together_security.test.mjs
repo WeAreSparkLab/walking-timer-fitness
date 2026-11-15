@@ -104,7 +104,14 @@ check('preview says expired', (await as(STRANGER, `select expired from public.pr
 
 // Existing behaviour that must keep working.
 check('walkers can still chat', !(await as(FRIEND, `insert into public.session_messages (session_id, sender_id, text) values ($1, $2, 'hi')`, [sid, FRIEND])).error);
-check('friend can leave', (await as(FRIEND, `delete from public.session_participants where session_id = $1 and user_id = $2 returning user_id`, [sid, FRIEND])).rows?.length === 1);
+
+// Chat: members see each other's messages; outsiders see nothing.
+await as(HOST, `insert into public.session_messages (session_id, sender_id, text) values ($1, $2, 'welcome')`, [sid, HOST]);
+check('friend can read the host’s message', (await as(FRIEND, `select text from public.session_messages where session_id = $1 and sender_id = $2`, [sid, HOST])).rows?.length === 1);
+check('host can read the friend’s message', (await as(HOST, `select text from public.session_messages where session_id = $1 and sender_id = $2`, [sid, FRIEND])).rows?.length === 1);
+check('stranger cannot read any messages', (await as(STRANGER, `select text from public.session_messages where session_id = $1`, [sid])).rows?.length === 0);
+check('stranger cannot post a message', !!(await as(STRANGER, `insert into public.session_messages (session_id, sender_id, text) values ($1, $2, 'hi')`, [sid, STRANGER])).error);
+check('only new messages come back for the catch-up query', (await as(FRIEND, `select text from public.session_messages where session_id = $1 and created_at > now() + interval '1 hour'`, [sid])).rows?.length === 0);check('friend can leave', (await as(FRIEND, `delete from public.session_participants where session_id = $1 and user_id = $2 returning user_id`, [sid, FRIEND])).rows?.length === 1);
 check('host can delete the walk', (await as(HOST, `delete from public.sessions where id = $1 returning id`, [sid])).rows?.length === 1);
 
 console.log(`\n${pass} passed, ${fail} failed`);
