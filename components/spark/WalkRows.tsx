@@ -45,9 +45,10 @@ export function WalkRow({ name, sub, segs, onPress, onEdit, onDelete }: { name: 
 }
 
 /** One of your group walks: tap to open; the trash (host) or exit (walker) button asks first. */
-export function GroupRow({ name, sub, isHost, onOpen, onRemove }: { name: string; sub: string; isHost: boolean; onOpen: () => void; onRemove: () => Promise<void> }) {
+export function GroupRow({ name, sub, isHost, onOpen, onRemove, onAgain }: { name: string; sub: string; isHost: boolean; onOpen: () => void; onRemove: () => Promise<void>; onAgain?: () => Promise<void> }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [again, setAgain] = useState(false);
   return (
     <Card onPress={onOpen} label={`Open group walk ${name}. ${sub}`} style={{ gap: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 56 }}>
@@ -62,6 +63,10 @@ export function GroupRow({ name, sub, isHost, onOpen, onRemove }: { name: string
         </Pressable>
         <Ionicons name="chevron-forward" size={20} color={ink.sub} />
       </View>
+      {onAgain ? (
+        <Button label={again ? 'Setting up…' : 'Walk again'} icon="refresh" kind="secondary" disabled={again}
+          onPress={async () => { setAgain(true); try { await onAgain(); } finally { setAgain(false); } }} a11yHint="Starts a new group walk with the same plan" />
+      ) : null}
       {confirming ? (
         <View style={{ gap: 10, padding: 12, borderRadius: round.sm, borderWidth: 1, borderColor: 'rgba(255,138,122,0.5)' }}>
           <Text accessibilityLiveRegion="polite" style={type.label}>

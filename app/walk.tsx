@@ -14,6 +14,7 @@ import { PRESETS, PHASE_COPY, Segment, buildSegments, fmtClock, fmtMinutes, segm
 import { useWalkClock, loadActiveWalk, saveActiveWalk, elapsedMs, ClockState } from '../lib/walk/engine';
 import { buzz, capabilities, chime, createWakeLock, speak, unlockAudio } from '../lib/walk/cues';
 import { getPlanById } from '../lib/storage';
+import { useGuest } from '../lib/guest';
 import { backgroundAudioSupported, cancelScheduled, clearLockScreen, scheduleCues, setLockScreen, startKeepAlive, stopKeepAlive } from '../lib/walk/backgroundAudio';
 
 const bgAudio = backgroundAudioSupported();
@@ -255,7 +256,7 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
             <>
               <Button big label="Start walk" icon="play" onPress={onStart} a11yHint="Starts the timer with your chosen cues" />
               <Toggle label="Bright light mode" value={prefs.brightMode} onChange={v => setPrefs({ brightMode: v })} palette={light ? LIGHT_TOGGLE : undefined} note="Light screen with dark text, for strong sunshine." />
-              <Button label="Sound and display settings" icon="options-outline" kind="quiet" onPress={() => router.push({ pathname: '/dashboard', params: { section: 'settings' } })}
+              <Button label="Sound and display settings" icon="options-outline" kind="quiet" onPress={() => router.push('/settings')}
                 tone={light ? { bg: 'transparent', fg: '#121212' } : undefined} a11yHint="Opens settings on the home screen" />
             </>
           ) : confirmFinish ? (
@@ -289,6 +290,7 @@ function ActiveWalk({ name, planId, segments, clock: initialClock }: Loaded) {
 
 function Finished({ seconds, complete, saved, name, segments }: { seconds: number; complete: boolean; saved: string; name: string; segments: Segment[] }) {
   const router = useRouter();
+  const guest = useGuest();
   const [prefs] = usePrefs();
   const world = getWorld(prefs.world);
   return (
@@ -306,9 +308,10 @@ function Finished({ seconds, complete, saved, name, segments }: { seconds: numbe
           <Text style={[type.num, { color: ink.text, fontSize: 40 }]}>{fmtClock(seconds)}</Text>
           <View style={{ marginTop: 12 }}><Timeline segments={segments} height={24} /></View>
           <Text style={[type.small, { marginTop: 12 }]}>
-            {saved === 'saving' ? 'Saving to your history…' : saved === 'saved' ? 'Saved to your history.' : seconds < 60 ? 'Walks under a minute aren’t saved.' : 'Couldn’t save to your history — check your connection or sign in.'}
+            {saved === 'saving' ? 'Saving to your history…' : saved === 'saved' ? 'Saved to your history.' : seconds < 60 ? 'Walks under a minute aren’t saved.' : guest ? 'Create a free account to keep a history of your walks.' : 'Couldn’t save to your history — check your connection or sign in.'}
           </Text>
         </Card>
+        {guest && saved !== 'saved' && saved !== 'saving' && seconds >= 60 ? <Button label="Create an account" icon="log-in-outline" kind="secondary" onPress={() => router.replace('/')} /> : null}
         <Button label="Back to home" onPress={() => router.replace('/dashboard')} />
       </View>
     </View>
