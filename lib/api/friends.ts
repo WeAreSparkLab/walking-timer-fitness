@@ -14,12 +14,30 @@ export async function sendFriendRequest(addresseeId: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
 
+  // Look at what's already between you. Requests can always be sent again.
+  const { data: existing } = await supabase
+    .from('friendships')
+    .select('*')
+    .or(`and(requester_id.eq.${user.id},addressee_id.eq.${addresseeId}),and(requester_id.eq.${addresseeId},addressee_id.eq.${user.id})`);
+  for (const f of existing || []) {
+    if (f.status === 'accepted') return f as Friendship;
+    if (f.status === 'pending' && f.requester_id === addresseeId) {
+      // They already asked you: sending one back just accepts theirs.
+      return await respondToFriendRequest(f.id, 'accepted');
+    }
+    // A pending one of mine is replaced (so it's fresh); an old "declined" row is cleared.
+    await supabase.from('friendships').delete().eq('id', f.id);
+  }
+
   const { data, error } = await supabase
     .from('friendships')
     .insert({ requester_id: user.id, addressee_id: addresseeId })
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    if (/blocked/i.test(error.message || '')) throw new Error('You can’t send a request to this person.');
+    throw error;
+  }
 
   // Get requester username for notification
   const { data: profile } = await supabase
@@ -250,4 +268,27 @@ export async function declineFriendRequest(friendshipId: string): Promise<void> 
   if (!user) throw new Error('Not signed in');
   const { error } = await supabase.from('friendships').delete().eq('id', friendshipId).eq('addressee_id', user.id).eq('status', 'pending');
   if (error) throw error;
+}
+/** Block someone: removes any friendship or request, and stops requests and messages either way. */
+export async function blockUser(userId: string): Promise<void> {
+  const { error } = await supabase.rpc('block_user', { target: userId });
+  if (error) throw error;
+}
+
+export async function unblockUser(userId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const { error } = await supabase.from('user_blocks').delete().eq('blocker_id', user.id).eq('blocked_id', userId);
+  if (error) throw error;
+}
+
+/** People you've blocked (empty if blocking isn't switched on yet). */
+export async function listBlocked(): Promise<{ id: string; username: string | null; avatar_url: string | null }[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data, error } = await supabase.from('user_blocks').select('blocked_id').eq('blocker_id', user.id);
+  if (error || !data?.length) return [];
+  const ids = data.map((b: any) => b.blocked_id);
+  const { data: profs } = await supabase.from('profiles').select('id, username, avatar_url').in('id', ids);
+  return ids.map((id: string) => (profs || []).find((p: any) => p.id === id) || { id, username: null, avatar_url: null });
 }

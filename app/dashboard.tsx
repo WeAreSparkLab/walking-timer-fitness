@@ -259,8 +259,8 @@ export default function Dashboard() {
 
         {/* First time */}
         {firstTime ? (
+          <Collapsible title="Welcome to Spark Walk" storageKey="sparkwalk.home.welcome">
           <Card style={{ gap: 14 }}>
-            <Text style={type.title}>Welcome to Spark Walk</Text>
             {[
               ['options-outline', 'Pick a walk', 'Try a ready-made walk or build your own mix of brisk and easy.'],
               ['volume-medium-outline', 'Walk with cues', 'Gentle chimes and an optional voice tell you when to change pace.'],
@@ -272,24 +272,8 @@ export default function Dashboard() {
               </View>
             ))}
           </Card>
+          </Collapsible>
         ) : null}
-
-        {/* Walks */}
-        <Section title="Choose a walk (just for you)" action={{ label: 'Create', icon: 'add', onPress: () => router.push('/create-walk') }}>
-          {sortedPlans.map(p => {
-            const segs = segmentsFromIntervals(p.intervals);
-            return <WalkRow key={p.id} name={p.name} sub={`${p.favourite ? '★ Favourite' : 'Your plan'} · ${fmtMinutes(totalSeconds(segs))}`} segs={segs}
-              onPress={() => router.push({ pathname: '/walk', params: { planId: p.id } })}
-              onEdit={() => router.push({ pathname: '/create-walk', params: { editId: p.id } })}
-              onDelete={async () => { await removePlan(p.id); setPlans(await getPlans()); }} />;
-          })}
-          {PRESETS.map(p => {
-            const segs = buildSegments(p.structure);
-            return <WalkRow key={p.id} name={p.name} sub={`${p.blurb} · ${fmtMinutes(totalSeconds(segs))}`} segs={segs}
-              onPress={() => router.push({ pathname: '/walk', params: { preset: p.id } })} />;
-          })}
-          <Text style={[type.small, { color: ink.faint }]}>These are for walking on your own. To walk with friends, tap Walk together to create a group walk. Ready-made walks are examples, not medical advice, so go at a pace that feels comfortable.</Text>
-        </Section>
 
         {/* Group walks */}
         {groups.length ? (
@@ -317,6 +301,23 @@ export default function Dashboard() {
             {groupError ? <Text accessibilityLiveRegion="polite" style={[type.small, { color: ink.danger }]}>{groupError}</Text> : null}
           </Collapsible>
         ) : null}
+
+        {/* Walks */}
+        <Section title="Choose a walk (just for you)" action={{ label: 'Create', icon: 'add', onPress: () => router.push('/create-walk') }}>
+          {sortedPlans.map(p => {
+            const segs = segmentsFromIntervals(p.intervals);
+            return <WalkRow key={p.id} name={p.name} sub={`${p.favourite ? '★ Favourite' : 'Your plan'} · ${fmtMinutes(totalSeconds(segs))}`} segs={segs}
+              onPress={() => router.push({ pathname: '/walk', params: { planId: p.id } })}
+              onEdit={() => router.push({ pathname: '/create-walk', params: { editId: p.id } })}
+              onDelete={async () => { await removePlan(p.id); setPlans(await getPlans()); }} />;
+          })}
+          {PRESETS.map(p => {
+            const segs = buildSegments(p.structure);
+            return <WalkRow key={p.id} name={p.name} sub={`${p.blurb} · ${fmtMinutes(totalSeconds(segs))}`} segs={segs}
+              onPress={() => router.push({ pathname: '/walk', params: { preset: p.id } })} />;
+          })}
+          <Text style={[type.small, { color: ink.faint }]}>These are for walking on your own. To walk with friends, tap Walk together to create a group walk. Ready-made walks are examples, not medical advice, so go at a pace that feels comfortable.</Text>
+        </Section>
 
         {/* Recent */}
         {recent && recent.length ? (

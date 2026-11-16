@@ -4,7 +4,7 @@ import { View, Text, ScrollView, Pressable, Image } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabaseClient';
-import { listIncomingFriendRequests, respondToFriendRequest, declineFriendRequest } from '../lib/api/friends';
+import { listIncomingFriendRequests, respondToFriendRequest, declineFriendRequest, blockUser } from '../lib/api/friends';
 import { refreshUnread } from '../lib/notify/counts';
 import { ink, round, space } from '../lib/spark/tokens';
 import { Button, Card, type, useSparkFonts } from '../components/spark/ui';
@@ -68,6 +68,7 @@ export default function Notifications() {
 
   const accept = async (r: Req) => { try { await respondToFriendRequest(r.id, 'accepted'); } catch { setError('Couldn’t accept that. Please try again.'); } load(); };
   const decline = async (r: Req) => { try { await declineFriendRequest(r.id); } catch { setError('Couldn’t remove that. Please try again.'); } load(); };
+  const block = async (r: Req) => { try { await blockUser(r.requester.id); } catch { setError('Couldn’t block them just now. Please try again later.'); } load(); };
   const dismiss = async (n: Note) => { await supabase.from('notifications').update({ read: true }).eq('id', n.id); load(); };
   const joinInvite = async (n: Note) => {
     const t = n.data?.token || n.data?.link?.match(/join\/([A-Za-z0-9_-]+)/)?.[1];
@@ -116,6 +117,7 @@ export default function Notifications() {
                   <Button label="Accept" icon="checkmark" style={{ flex: 1 }} onPress={() => accept(r)} />
                   <Button label="Not now" kind="secondary" style={{ flex: 1 }} onPress={() => decline(r)} />
                 </View>
+                <Button label="Block this person" icon="ban-outline" kind="quiet" onPress={() => block(r)} a11yHint="They won’t be able to send you requests or messages" />
               </Card>
             ))}
           </View>

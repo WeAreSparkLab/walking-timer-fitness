@@ -126,15 +126,16 @@ export default function LoginScreen() {
   };
   if (checkingSession) {
     return (
-      <View style={[styles.container, { justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.accent} />
-        <Text accessibilityRole="header" style={{ color: colors.text, textAlign: 'center', marginTop: 18 }}>Spark Walk: your interval walking timer</Text>
-        <Text style={{ color: colors.text, textAlign: 'center', marginTop: 12, maxWidth: 520, paddingHorizontal: 24 }}>
-          Set a comfortable pace with alternating brisk and easy walking intervals. Follow the sound cues, try the 21-minute default walk, or create a plan that suits your day.
-        </Text>
-        <Text style={{ color: colors.text, textAlign: 'center', marginTop: 12, maxWidth: 520, paddingHorizontal: 24 }}>
-          Spark Walk keeps track of the timing so you can focus on moving. Your walk can be short, gentle, or more energetic — make it work for you.
-        </Text>
+      <View style={[styles.container, { justifyContent: 'center' }]} accessibilityLabel="Spark Walk is loading">
+        <LinearGradient
+          colors={['rgba(242,166,90,0.25)', 'rgba(156,197,161,0.10)']}
+          style={styles.bgGlow}
+          start={{ x: 0.1, y: 0.1 }}
+          end={{ x: 0.9, y: 0.9 }}
+        />
+        <Text accessibilityRole="header" style={{ color: colors.text, fontSize: 34, fontWeight: '700', letterSpacing: 0.5 }}>Spark Walk</Text>
+        <Text style={{ color: colors.accent, marginTop: 8, fontSize: 15 }}>Your pace. Your path. Better together.</Text>
+        <ActivityIndicator size="small" color={colors.accent} style={{ marginTop: 28 }} />
       </View>
     );
   }
