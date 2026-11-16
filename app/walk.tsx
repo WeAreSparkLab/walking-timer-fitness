@@ -308,10 +308,10 @@ function Finished({ seconds, complete, saved, name, segments }: { seconds: numbe
           <Text style={[type.num, { color: ink.text, fontSize: 40 }]}>{fmtClock(seconds)}</Text>
           <View style={{ marginTop: 12 }}><Timeline segments={segments} height={24} /></View>
           <Text style={[type.small, { marginTop: 12 }]}>
-            {saved === 'saving' ? 'Saving to your history…' : saved === 'saved' ? 'Saved to your history.' : seconds < 60 ? 'Walks under a minute aren’t saved.' : guest ? 'Create a free account to keep a history of your walks.' : 'Couldn’t save to your history — check your connection or sign in.'}
+            {saved === 'saving' ? 'Saving to your history…' : saved === 'saved' ? (guest ? 'Saved on this device. Create a free account to keep your walks everywhere.' : 'Saved to your history.') : seconds < 60 ? 'Walks under a minute aren’t saved.' : 'Couldn’t save to your history. Check your connection or sign in.'}
           </Text>
         </Card>
-        {guest && saved !== 'saved' && saved !== 'saving' && seconds >= 60 ? <Button label="Create an account" icon="log-in-outline" kind="secondary" onPress={() => router.replace('/')} /> : null}
+        {guest && saved !== 'saving' && seconds >= 60 ? <Button label="Create an account" icon="log-in-outline" kind="secondary" onPress={() => router.replace('/')} /> : null}
         <Button label="Back to home" onPress={() => router.replace('/dashboard')} />
       </View>
     </View>
