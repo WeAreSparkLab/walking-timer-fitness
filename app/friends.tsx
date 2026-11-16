@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad, radius } from '../lib/theme';
 import { supabase } from '../lib/supabaseClient';
-import { sendFriendRequest, listMyFriends, listIncomingFriendRequests, respondToFriendRequest } from '../lib/api/friends';
+import { sendFriendRequest, listMyFriends, listIncomingFriendRequests, respondToFriendRequest, declineFriendRequest, blockUser, unblockUser, listBlocked } from '../lib/api/friends';
 import { findPeople } from '../lib/api/people';
 import { useMyProfile } from '../lib/useMyProfile';
 import { notifyFriendRequest } from '../lib/webNotifications';
@@ -20,8 +20,10 @@ export default function Friends() {
   const [requests, setRequests] = useState<any[]>([]);
   const [sentRequests, setSentRequests] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [blocked, setBlocked] = useState<{ id: string; username: string | null }[]>([]);
 
   useEffect(() => {
+    listBlocked().then(setBlocked).catch(() => {});
     loadFriends();
     loadRequests();
     loadSentRequests();
@@ -139,7 +141,7 @@ export default function Friends() {
       setNotice({ kind: 'info', text: 'Friend request sent.' });
     } catch (error: any) {
       console.error('Add friend error:', error);
-      setNotice({ kind: 'error', text: /duplicate|already/i.test(error?.message || '') ? 'You’ve already sent a request to this person.' : 'Couldn’t send the request. Please try again.' });
+      setNotice({ kind: 'error', text: /can’t send/.test(error?.message || '') ? error.message : 'Couldn’t send the request. Please try again.' });
     }
   };
 
@@ -148,20 +150,36 @@ export default function Friends() {
       await respondToFriendRequest(friendshipId, 'accepted');
       loadFriends();
       loadRequests();
-      Alert.alert('Success', 'Friend request accepted!');
+      setNotice({ kind: 'info', text: 'Friend request accepted.' });
     } catch (error) {
       console.error('Accept error:', error);
-      Alert.alert('Error', 'Failed to accept request');
+      setNotice({ kind: 'error', text: 'Couldn’t accept that. Please try again.' });
     }
   };
 
   const handleRejectRequest = async (friendshipId: string) => {
     try {
-      await respondToFriendRequest(friendshipId, 'blocked');
+      await declineFriendRequest(friendshipId); // just removes it: they can ask again, and so can you
       loadRequests();
     } catch (error) {
       console.error('Reject error:', error);
     }
+  };
+
+  const handleBlock = async (userId: string) => {
+    try {
+      await blockUser(userId);
+      setBlocked(await listBlocked());
+      loadRequests(); loadFriends();
+      setNotice({ kind: 'info', text: 'Blocked. They can’t send you requests or messages. You can undo this under Blocked people on the Friends tab.' });
+    } catch {
+      setNotice({ kind: 'error', text: 'Couldn’t block them just now. Please try again later.' });
+    }
+  };
+
+  const handleUnblock = async (userId: string) => {
+    try { await unblockUser(userId); setBlocked(await listBlocked()); setNotice({ kind: 'info', text: 'Unblocked.' }); }
+    catch { setNotice({ kind: 'error', text: 'Couldn’t unblock just now. Please try again.' }); }
   };
 
   return (
@@ -217,6 +235,9 @@ export default function Friends() {
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+        {notice && activeTab !== 'search' ? (
+          <Text accessibilityLiveRegion="polite" style={{ color: notice.kind === 'error' ? colors.danger : colors.text, marginBottom: 10, fontSize: 14 }}>{notice.text}</Text>
+        ) : null}
         {activeTab === 'friends' && (
           <View style={styles.section}>
             {friends.length === 0 ? (
@@ -261,6 +282,19 @@ export default function Friends() {
                 </TouchableOpacity>
               ))
             )}
+            {blocked.length ? (
+              <View style={{ marginTop: 24, gap: 8 }}>
+                <Text accessibilityRole="header" style={{ color: colors.sub, fontSize: 13 }}>Blocked people</Text>
+                {blocked.map(b => (
+                  <View key={b.id} style={styles.userCard}>
+                    <View style={styles.userInfo}><Text style={styles.userName}>{b.username || 'User'}</Text></View>
+                    <TouchableOpacity onPress={() => handleUnblock(b.id)} style={styles.rejectBtn} accessibilityRole="button" accessibilityLabel={`Unblock ${b.username || 'this person'}`}>
+                      <Text style={styles.checkIcon}>Unblock</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         )}
 
@@ -323,16 +357,17 @@ export default function Friends() {
                       </View>
                       <View style={styles.userInfo}>
                         <Text style={styles.userName}>{user.username || 'User'}</Text>
-                        {isPending && <Text style={styles.pendingText}>Request Pending</Text>}
+                        {isPending && <Text style={styles.pendingText}>Request sent. Tap ⏳ to send again</Text>}
                         {!isPending && <Text style={styles.userEmail}>Tap to view profile</Text>}
                       </View>
                       <TouchableOpacity 
                         onPress={(e) => {
                           e.stopPropagation();
-                          if (!isPending) handleAddFriend(user.id);
+                          handleAddFriend(user.id);
                         }}
-                        style={[styles.addBtn, isPending && styles.addBtnDisabled]}
-                        disabled={isPending}
+                        style={styles.addBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={isPending ? 'Send the request again' : 'Send friend request'}
                       >
                         <Text style={styles.addIcon}>{isPending ? '⏳' : '+'}</Text>
                       </TouchableOpacity>
@@ -391,6 +426,12 @@ export default function Friends() {
                       style={styles.rejectBtn}
                     >
                       <Text style={[styles.checkIcon, { color: colors.danger }]}>✕</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={(e) => { e.stopPropagation(); handleBlock(req.requester_id); }}
+                      style={styles.rejectBtn} accessibilityRole="button" accessibilityLabel={`Block ${req.requester?.username || 'this person'}`}
+                    >
+                      <Text style={styles.checkIcon}>🚫</Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
