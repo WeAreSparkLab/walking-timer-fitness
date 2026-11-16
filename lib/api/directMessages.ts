@@ -67,11 +67,11 @@ export async function sendDirectMessage(recipientId: string, text: string) {
   // Send push notification to recipient
   const senderName = profile?.username || 'Someone';
   const previewText = text.length > 50 ? text.substring(0, 50) + '...' : text;
-  await sendNotificationToUser(
+  void sendNotificationToUser(
     recipientId,
-    `💬 ${senderName}`,
+    senderName,
     previewText,
-    { type: 'direct_message', sender_id: user.id, sender_name: senderName }
+    { type: 'direct_message', sender_id: user.id, sender_name: senderName, url: `/chat/${user.id}?friendName=${encodeURIComponent(senderName)}` }
   );
 
   return {

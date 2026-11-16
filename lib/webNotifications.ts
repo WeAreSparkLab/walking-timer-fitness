@@ -55,10 +55,17 @@ export async function subscribeToWebPush(): Promise<void> {
     const registration = await navigator.serviceWorker.ready;
 
     // VAPID key - must match the one in Supabase Edge Function secrets
-    const vapidPublicKey = 'BPREOpNMvhTuXhI_3s9JWM2cEwNSz2we9oPMYiq-5I14BCIssmpEG1BHNPsM2CW5sJ3CWv3tV-0VniAi8EOKmQU';
+    const vapidPublicKey = 'BIHlArk8DdQCcVXQ2z1mUHCx6bmgdUivKcz6FZ2d_f-shkuSS8SlF-c-xUadbS7cA7jaIMNkupZp3o9vhsHeN78';
 
     // Check for existing subscription
-    const existingSubscription = await registration.pushManager.getSubscription();
+    let existingSubscription = await registration.pushManager.getSubscription();
+    // A subscription made with an older key can't receive our pushes: replace it.
+    if (existingSubscription) {
+      const have = existingSubscription.options?.applicationServerKey;
+      const want = urlBase64ToUint8Array(vapidPublicKey);
+      const same = have && new Uint8Array(have as ArrayBuffer).length === want.length && new Uint8Array(have as ArrayBuffer).every((v, i) => v === want[i]);
+      if (!same) { try { await existingSubscription.unsubscribe(); } catch {} existingSubscription = null; }
+    }
     if (existingSubscription) {
       // Already have a subscription - check if it's saved to the database
       const { data: { user } } = await supabase.auth.getUser();

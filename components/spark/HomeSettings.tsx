@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { usePrefs } from '../../lib/spark/prefs';
 import { capabilities, chime, speak, unlockAudio } from '../../lib/walk/cues';
 import { useInstall, manualSteps } from '../../lib/install';
-import { requestNotificationPermission } from '../../lib/webNotifications';
+import { ensureWebPushEnabled } from '../../lib/webNotifications';
 import { ink, phaseTone, round, space } from '../../lib/spark/tokens';
 import { Button, Card, Toggle, type } from './ui';
 
@@ -86,7 +86,7 @@ export default function HomeSettings() {
             <Text style={type.small}>Notifications are blocked in your browser settings. You can allow them there for this site.</Text>
           ) : (
             <Button label="Allow notifications" icon="notifications-outline" kind="secondary"
-              onPress={async () => { await requestNotificationPermission(); setPerm((Notification as any).permission); }} />
+              onPress={async () => { await ensureWebPushEnabled(); setPerm((Notification as any).permission); }} />
           )
         ) : null}
         <Text style={[type.small, { color: ink.faint }]}>Alerts reach you while the app is open or in the background. When the app is fully closed, nothing is sent yet.</Text>
