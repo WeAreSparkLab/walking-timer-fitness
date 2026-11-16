@@ -6,7 +6,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabaseClient';
 import { getPlans, removePlan, WalkPlan } from '../lib/storage';
-import { getRecentActivities, getPeriodStats, Activity } from '../lib/api/stats';
+import { getRecentActivities, getMyProgress, Activity, Progress } from '../lib/api/stats';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deleteSession, leaveSession } from '../lib/api/sessions';
 import { PENDING_JOIN_KEY, getTogether, createTogetherWalk } from '../lib/api/together';
@@ -48,7 +48,7 @@ export default function Dashboard() {
   const [plans, setPlans] = useState<WalkPlan[]>([]);
   const [active, setActive] = useState<ActiveWalk | null>(null);
   const [recent, setRecent] = useState<Activity[] | null>(null);
-  const [weekSeconds, setWeekSeconds] = useState(0);
+  const [progress, setProgress] = useState<Progress | null>(null);
   const [groups, setGroups] = useState<GroupWalk[]>([]);
   const [groupError, setGroupError] = useState<string | null>(null);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -79,7 +79,7 @@ export default function Dashboard() {
     setPlans(await getPlans());
     setActive(await loadActiveWalk());
     getRecentActivities(4).then(setRecent).catch(() => setRecent([]));
-    getPeriodStats('week').then(s => setWeekSeconds(s.duration_seconds)).catch(() => {});
+    getMyProgress().then(setProgress).catch(() => {});
     loadGroups().then(setGroups).catch(() => {});
     loadInvites().then(setInvites).catch(() => {});
   }, []);
@@ -325,8 +325,9 @@ export default function Dashboard() {
 
         {/* Recent */}
         {recent && recent.length ? (
-          <Section title="Recently">
-            <Text style={type.body}>{weekSeconds > 0 ? `${fmtMinutes(weekSeconds)} of walking this week.` : 'A fresh week — no pressure.'}</Text>
+          <Section title="Your walking">
+            {progress ? <ProgressCard p={progress} /> : null}
+            <Text style={[type.small, { color: ink.faint }]}>Only you can see this. It counts the time you actually walked.</Text>
             {recent.map(a => (
               <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 }}>
                 <Ionicons name={a.activity_type === 'group_walk' ? 'people-outline' : 'walk-outline'} size={20} color={ink.sub} />
@@ -340,6 +341,37 @@ export default function Dashboard() {
         <Text style={[type.small, { color: ink.faint, textAlign: 'center' }]}>Your pace. Your path. Better together.</Text>
       </View>
     </ScrollView>
+  );
+}
+
+const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+/** This week and this month, in plain words. No streaks, points or comparisons. */
+function ProgressCard({ p }: { p: Progress }) {
+  const walks = (n: number) => `${n} ${n === 1 ? 'walk' : 'walks'}`;
+  const summary = p.weekWalks
+    ? `${walks(p.weekWalks)} · ${fmtMinutes(p.weekSeconds)} this week`
+    : 'A fresh week. No pressure.';
+  const walkedDays = DAY_NAMES.filter((_, i) => p.days[i]);
+  return (
+    <Card style={{ gap: 12 }}>
+      <Text accessibilityRole="header" style={type.label}>{summary}</Text>
+      <View accessible accessibilityLabel={walkedDays.length ? `Days you walked this week: ${walkedDays.join(', ')}` : 'No walks yet this week'}
+        style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        {DAY_LETTERS.map((l, i) => (
+          <View key={i} style={{ alignItems: 'center', gap: 6, flex: 1 }}>
+            <View style={{
+              width: 22, height: 22, borderRadius: 11,
+              backgroundColor: p.days[i] ? ink.ember : 'transparent',
+              borderWidth: p.days[i] ? 0 : 1.5, borderColor: i === p.today ? ink.sub : ink.faint,
+            }} />
+            <Text style={[type.small, { color: i === p.today ? ink.text : ink.faint }]}>{l}</Text>
+          </View>
+        ))}
+      </View>
+      {p.monthWalks ? <Text style={type.small}>This month: {walks(p.monthWalks)} · {fmtMinutes(p.monthSeconds)}</Text> : null}
+    </Card>
   );
 }
 

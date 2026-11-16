@@ -13,7 +13,6 @@ import {
   respondToFriendRequest,
   cancelFriendRequest 
 } from '../../lib/api/friends';
-import { getUserStatsById, getUserLeaderboardPosition, formatDuration } from '../../lib/api/stats';
 
 type UserProfile = {
   id: string;
@@ -37,8 +36,6 @@ export default function UserProfilePage() {
   };
   
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [stats, setStats] = useState<any>(null);
-  const [leaderboardPosition, setLeaderboardPosition] = useState<{ rank: number; totalUsers: number } | null>(null);
   const [friendStatus, setFriendStatus] = useState<FriendStatus>('none');
   const [friendshipId, setFriendshipId] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
@@ -69,14 +66,6 @@ export default function UserProfilePage() {
 
       if (profileError) throw profileError;
       setProfile(profileData);
-
-      // Load stats
-      const userStats = await getUserStatsById(userId);
-      setStats(userStats);
-
-      // Load leaderboard position
-      const position = await getUserLeaderboardPosition(userId, 'all');
-      setLeaderboardPosition(position);
 
       // Load friendship status (if logged in and not own profile)
       if (user && user.id !== userId) {
@@ -333,38 +322,9 @@ export default function UserProfilePage() {
           
           <Text style={styles.username}>{profile.username || 'User'}</Text>
           
-          {leaderboardPosition && (
-            <View style={styles.rankBadge}>
-              <Text style={styles.rankText}>
-                #{leaderboardPosition.rank} of {leaderboardPosition.totalUsers}
-              </Text>
-            </View>
-          )}
-
           {/* Friend Action Button */}
           <View style={styles.actionContainer}>
             {renderFriendButton()}
-          </View>
-        </View>
-
-        {/* Stats */}
-        <Text style={styles.sectionTitle}>Statistics</Text>
-        <View style={styles.statsGrid}>
-          <View style={[styles.statCard, shadow.card]}>
-            <Text style={styles.statNumber}>{stats?.total_points || 0}</Text>
-            <Text style={styles.statLabel}>Points</Text>
-          </View>
-          <View style={[styles.statCard, shadow.card]}>
-            <Text style={styles.statNumber}>{stats?.total_walks || 0}</Text>
-            <Text style={styles.statLabel}>Walks</Text>
-          </View>
-          <View style={[styles.statCard, shadow.card]}>
-            <Text style={styles.statNumber}>{formatDuration(stats?.total_duration_seconds || 0)}</Text>
-            <Text style={styles.statLabel}>Total Time</Text>
-          </View>
-          <View style={[styles.statCard, shadow.card]}>
-            <Text style={styles.statNumber}>{stats?.current_streak_days || 0}</Text>
-            <Text style={styles.statLabel}>Day Streak</Text>
           </View>
         </View>
 
