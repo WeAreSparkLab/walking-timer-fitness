@@ -234,15 +234,9 @@ export default function Dashboard() {
           <>
 
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={{ flex: 1 }}>
-            <Button label="Friends" icon="heart-outline" kind="secondary" style={{ paddingHorizontal: 10 }} onPress={() => router.push('/friends')} />
-            <Badge count={unread.friendRequests} style={{ position: 'absolute', top: -6, right: -4 }} label={`${unread.friendRequests} friend requests`} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button label="Messages" icon="chatbubbles-outline" kind="secondary" style={{ paddingHorizontal: 10 }} onPress={() => router.push('/messages')} />
-            <Badge count={unread.messages} style={{ position: 'absolute', top: -6, right: -4 }} label={`${unread.messages} unread messages`} />
-          </View>
-          <Button label="Profile" icon="person-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/profile')} />
+          <ShortcutTile label="Friends" icon="heart-outline" badge={unread.friendRequests} badgeLabel={`${unread.friendRequests} friend requests`} onPress={() => router.push('/friends')} />
+          <ShortcutTile label="Messages" icon="chatbubbles-outline" badge={unread.messages} badgeLabel={`${unread.messages} unread messages`} onPress={() => router.push('/messages')} />
+          <ShortcutTile label="Profile" icon="person-outline" onPress={() => router.push('/profile')} />
         </View>
           </>
         )}
@@ -344,7 +338,21 @@ export default function Dashboard() {
   );
 }
 
-const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+/** Three equal tiles that fit any phone: icon above the label. */
+function ShortcutTile({ label, icon, onPress, badge = 0, badgeLabel }: { label: string; icon: any; onPress: () => void; badge?: number; badgeLabel?: string }) {
+  return (
+    <View style={{ flex: 1 }}>
+      <Card onPress={onPress} label={badge ? `${label}. ${badgeLabel}` : label}
+        style={{ minHeight: 76, paddingVertical: 12, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        <Ionicons name={icon} size={24} color={ink.moss} />
+        <Text style={[type.label, { fontSize: 15 }]} numberOfLines={1}>{label}</Text>
+      </Card>
+      <Badge count={badge} style={{ position: 'absolute', top: -6, right: -2 }} label={badgeLabel} />
+    </View>
+  );
+}
+
+const DAY_LETTERS =['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 /** This week and this month, in plain words. No streaks, points or comparisons. */
