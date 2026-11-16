@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad, radius, shadow } from '../lib/theme';
 import { supabase } from '../lib/supabaseClient';
 import { initializePushNotifications } from '../lib/notifications';
+import { setGuest } from '../lib/guest';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -80,6 +81,7 @@ export default function LoginScreen() {
 
         if (data.session) {
           // Initialize push notifications after successful sign in
+          await setGuest(false); // signed in: no longer just exploring
           await initializePushNotifications();
           router.replace('/dashboard');
         }
@@ -247,7 +249,23 @@ export default function LoginScreen() {
               </Text>
             </Text>
           </TouchableOpacity>
-        )}      </View>
+        )}
+
+        {!forgot ? (
+          <View style={{ marginTop: 8, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.line, alignItems: 'center' }}>
+            <TouchableOpacity
+              onPress={async () => { await setGuest(true); router.replace('/dashboard'); }}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityHint="Look around without creating an account"
+              style={{ minHeight: 48, justifyContent: 'center' }}
+            >
+              <Text style={styles.switchText}>Just looking? <Text style={[styles.switchTextBold, { textDecorationLine: 'underline' }]}>Explore as a guest</Text></Text>
+            </TouchableOpacity>
+            <Text style={{ color: colors.sub, fontSize: 12, textAlign: 'center', marginTop: 2 }}>No account needed. Walk on your own, build walks and try the worlds.</Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }

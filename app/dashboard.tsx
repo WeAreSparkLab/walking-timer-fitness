@@ -9,10 +9,11 @@ import { getPlans, removePlan, WalkPlan } from '../lib/storage';
 import { getRecentActivities, getPeriodStats, Activity } from '../lib/api/stats';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { deleteSession, leaveSession } from '../lib/api/sessions';
-import { PENDING_JOIN_KEY } from '../lib/api/together';
+import { PENDING_JOIN_KEY, getTogether, createTogetherWalk } from '../lib/api/together';
 import { useMyProfile } from '../lib/useMyProfile';
 import { ensureMyProfile } from '../lib/api/profile';
 import { useUnread } from '../lib/notify/counts';
+import { useGuest, loadGuest } from '../lib/guest';
 import { Badge } from '../components/spark/Badge';
 import { loadActiveWalk, ActiveWalk, elapsedMs } from '../lib/walk/engine';
 import { PRESETS, buildSegments, segmentsFromIntervals, totalSeconds, fmtMinutes, fmtClock } from '../lib/walk/schedule';
@@ -55,28 +56,25 @@ export default function Dashboard() {
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const { section } = useLocalSearchParams<{ section?: string }>();
-  useEffect(() => {
-    if (section !== 'settings' || !authChecked || Platform.OS !== 'web') return;
-    const t = setTimeout(() => document.getElementById('settings')?.scrollIntoView({ behavior: 'smooth' }), 500);
-    return () => clearTimeout(t);
-  }, [section, authChecked]);
+  const guest = useGuest();
+  const [guestPrompt, setGuestPrompt] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) router.replace('/');
-      else {
-        setUserId(session.user.id); setAuthChecked(true); ensureMyProfile().catch(() => {});
-        // Opened an invitation before signing in? Continue to it now.
-        AsyncStorage.getItem(PENDING_JOIN_KEY).then(t => { if (t) router.push(`/join/${t}`); }).catch(() => {});
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        // Not signed in: guests can look around; everyone else goes to the sign-in page.
+        if (await loadGuest()) setAuthChecked(true); else router.replace('/');
+        return;
       }
+      setUserId(session.user.id); setAuthChecked(true); ensureMyProfile().catch(() => {});
+      // Opened an invitation before signing in? Continue to it now.
+      AsyncStorage.getItem(PENDING_JOIN_KEY).then(t => { if (t) router.push(`/join/${t}`); }).catch(() => {});
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (!session) router.replace('/');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, session) => {
+      if (!session && !(await loadGuest())) router.replace('/');
     });
     return () => subscription.unsubscribe();
   }, []);
-
   const load = useCallback(async () => {
     setPlans(await getPlans());
     setActive(await loadActiveWalk());
@@ -136,6 +134,17 @@ export default function Dashboard() {
             <Ionicons name="sparkles" size={16} color={ink.ember} />
             <Text style={[type.label, { fontSize: 15 }]}>Spark Walk</Text>
           </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Pressable onPress={() => router.push('/settings')} accessibilityRole="button" accessibilityLabel="Settings and walking worlds"
+              style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(13,19,16,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: 'rgba(246,241,231,0.4)' }}>
+              <Ionicons name="settings-outline" size={20} color={ink.text} />
+            </Pressable>
+            {guest ? (
+              <Pressable onPress={() => router.push('/')} accessibilityRole="button" accessibilityLabel="Sign in or create an account"
+                style={{ minHeight: 44, paddingHorizontal: 16, borderRadius: 22, backgroundColor: ink.ember, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={[type.label, { color: ink.emberInk, fontSize: 15 }]}>Sign in</Text>
+              </Pressable>
+            ) : (
           <View style={{ width: 48, height: 48 }}>
             <Pressable onPress={() => router.push(unread.total > 0 ? '/notifications' : '/profile')} accessibilityRole="button"
               accessibilityLabel={unread.total > 0 ? `Your profile. ${unread.total} new notification${unread.total === 1 ? '' : 's'}. Tap to see them.` : 'Your profile'}
@@ -143,6 +152,8 @@ export default function Dashboard() {
               {avatarUrl ? <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44 }} /> : <Ionicons name="person" size={22} color={ink.text} />}
             </Pressable>
             <Badge count={unread.total} style={{ position: 'absolute', top: -6, right: -6 }} />
+          </View>
+            )}
           </View>
         </View>
         <View style={wrap({ paddingHorizontal: space.md, paddingBottom: 8 })}>
@@ -173,17 +184,24 @@ export default function Dashboard() {
 
         {/* Together */}
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <Card style={{ flex: 1, gap: 8, minHeight: 128 }} onPress={() => router.push('/together/new')} label="Walk together: create a group walk and invite friends">
+          <Card style={{ flex: 1, gap: 8, minHeight: 128 }} onPress={() => (guest ? setGuestPrompt(true) : router.push('/together/new'))} label="Walk together: create a group walk and invite friends">
             <Ionicons name="people-outline" size={26} color={ink.moss} />
             <Text style={type.label}>Walk together</Text>
             <Text style={type.small}>Create a group walk and invite friends</Text>
           </Card>
-          <Card style={{ flex: 1, gap: 8, minHeight: 128 }} onPress={() => setJoinOpen(o => !o)} label="Join a friend’s walk with an invitation link">
+          <Card style={{ flex: 1, gap: 8, minHeight: 128 }} onPress={() => (guest ? setGuestPrompt(true) : setJoinOpen(o => !o))} label="Join a friend’s walk with an invitation link">
             <Ionicons name="link-outline" size={26} color={ink.moss} />
             <Text style={type.label}>Join a walk</Text>
             <Text style={type.small}>Paste a friend’s invitation</Text>
           </Card>
         </View>
+        {guest && guestPrompt ? (
+          <Card style={{ gap: 10, borderColor: 'rgba(242,166,90,0.55)', backgroundColor: 'rgba(242,166,90,0.08)' }}>
+            <Text style={type.title}>Walking together needs an account</Text>
+            <Text style={type.small}>It’s free. With an account you can invite friends, join their walks and keep your walking history. You can still use everything else as a guest.</Text>
+            <Button label="Sign in or create an account" icon="log-in-outline" onPress={() => router.push('/')} />
+          </Card>
+        ) : null}
         {joinOpen ? (
           <Card style={{ gap: 10 }}>
             <Text nativeID="joinLabel" style={type.label}>Invitation link or code</Text>
@@ -210,7 +228,11 @@ export default function Dashboard() {
           </Card>
         ) : null}
 
-        {/* Shortcuts */}
+        {guest ? (
+          <Button label="Sign in or create an account" icon="log-in-outline" kind="secondary" onPress={() => router.push('/')} a11yHint="Needed to walk with friends and keep your history" />
+        ) : (
+          <>
+
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <View style={{ flex: 1 }}>
             <Button label="Friends" icon="heart-outline" kind="secondary" style={{ paddingHorizontal: 10 }} onPress={() => router.push('/friends')} />
@@ -218,8 +240,10 @@ export default function Dashboard() {
           </View>
           <Button label="Profile" icon="person-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/profile')} />
         </View>
+          </>
+        )}
 
-        <InstallNudge onHowTo={() => document.getElementById('settings')?.scrollIntoView({ behavior: 'smooth' })} />
+        <InstallNudge onHowTo={() => router.push('/settings')} />
 
         {/* Invitations */}
         {invites.map(inv => (
@@ -271,9 +295,16 @@ export default function Dashboard() {
         {groups.length ? (
           <Collapsible title={`Your group walks (${groups.length})`} storageKey="sparkwalk.home.groupWalks"
             action={<Button label="New" icon="add" kind="quiet" onPress={() => router.push('/together/new')} style={{ minHeight: 48, paddingHorizontal: 8 }} />}>
-            {groups.slice(0, 5).map(g => (
+            {groups.slice(0, 8).map(g => (
               <GroupRow key={g.id} name={g.name || 'Group walk'} isHost={g.host_id === userId}
-                sub={`${g.host_id === userId ? 'You’re hosting' : 'Joined'} · ${g.count} ${g.count === 1 ? 'walker' : 'walkers'}`}
+                sub={`${g.status === 'completed' ? 'Finished' : g.host_id === userId ? 'You’re hosting' : 'Joined'} · ${g.count} ${g.count === 1 ? 'walker' : 'walkers'}`}
+                onAgain={g.status === 'completed' ? async () => {
+                  try {
+                    const s = await getTogether(g.id);
+                    const r = await createTogetherWalk(s.name || 'Group walk', s.plan);
+                    router.push(`/together/${r.session.id}`);
+                  } catch { setGroupError('Couldn’t set up a new walk. Check your connection and try again.'); }
+                } : undefined}
                 onOpen={() => router.push(`/together/${g.id}`)}
                 onRemove={async () => {
                   try {
@@ -300,31 +331,6 @@ export default function Dashboard() {
             ))}
           </Section>
         ) : null}
-
-        {/* World picker */}
-        <Section title="Your walking world">
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 }}>
-            {[...WORLDS, SIMPLE_WORLD].map(w => {
-              const on = prefs.world === w.id;
-              return (
-                <Pressable key={w.id} onPress={() => setPrefs({ world: w.id })} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={`${w.name}. ${w.line}`}
-                  style={{ width: '48%', borderRadius: round.md, overflow: 'hidden', borderWidth: 2, borderColor: on ? ink.ember : ink.line }}>
-                  <View style={{ height: 80 }}><Scenery world={w} still /></View>
-                  <View style={{ padding: 10, backgroundColor: ink.cardSolid, minHeight: 64 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      {on ? <Ionicons name="checkmark-circle" size={16} color={ink.ember} /> : null}
-                      <Text style={[type.label, { fontSize: 14, flexShrink: 1 }]} numberOfLines={2}>{w.name}</Text>
-                    </View>
-                    <Text style={[type.small, { fontSize: 13 }]} numberOfLines={2}>{w.line}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Text style={[type.small, { color: ink.faint }]}>Worlds are scenery for the app, not maps of where you are.</Text>
-        </Section>
-
-        <HomeSettings />
 
         <Text style={[type.small, { color: ink.faint, textAlign: 'center' }]}>Your pace. Your path. Better together.</Text>
       </View>
@@ -353,7 +359,7 @@ async function loadGroups(): Promise<GroupWalk[]> {
   const ids = (mine || []).map(r => r.session_id);
   if (!ids.length) return [];
   const { data: sessions } = await supabase.from('sessions').select('id, name, status, host_id, created_at')
-    .in('id', ids).neq('status', 'completed').order('created_at', { ascending: false }).limit(5);
+    .in('id', ids).or(`status.neq.completed,updated_at.gt.${new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString()}`).order('created_at', { ascending: false }).limit(8);
   const { data: parts } = await supabase.from('session_participants').select('session_id').in('session_id', (sessions || []).map(s => s.id));
   return (sessions || []).map(s => ({ ...s, count: (parts || []).filter(p => p.session_id === s.id).length }));
 }

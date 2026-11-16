@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { usePrefs } from '../../lib/spark/prefs';
 import { capabilities, chime, speak, unlockAudio } from '../../lib/walk/cues';
 import { useInstall, manualSteps } from '../../lib/install';
+import { useGuest } from '../../lib/guest';
 import { ensureWebPushEnabled } from '../../lib/webNotifications';
 import { ink, phaseTone, round, space } from '../../lib/spark/tokens';
 import { Button, Card, Toggle, type } from './ui';
@@ -16,6 +17,7 @@ export default function HomeSettings() {
   const [prefs, setPrefs] = usePrefs();
   const caps = useMemo(capabilities, []);
   const { kind, install } = useInstall();
+  const guest = useGuest();
   const [confirmOut, setConfirmOut] = useState(false);
   const [installMsg, setInstallMsg] = useState<string | null>(null);
   const [perm, setPerm] = useState<string>(typeof window !== 'undefined' && 'Notification' in window ? (Notification as any).permission : 'default');
@@ -34,8 +36,6 @@ export default function HomeSettings() {
 
   return (
     <View nativeID="settings" style={{ gap: space.md }}>
-      <Text accessibilityRole="header" style={type.title}>Settings</Text>
-
       {kind !== 'hidden' ? (
         <Group title="Install the app">
           {kind === 'installed' ? (
@@ -76,6 +76,7 @@ export default function HomeSettings() {
         <Button label="Test sound" icon="volume-medium-outline" kind="secondary" onPress={testSound} />
       </Group>
 
+      {!guest ? (
       <Group title="Alerts">
         <Toggle label="Friend, invitation and chat alerts" value={prefs.alerts} onChange={v => setPrefs({ alerts: v })}
           note="A soft sound, a short buzz and a banner when something new arrives while Spark Walk is open." />
@@ -91,6 +92,7 @@ export default function HomeSettings() {
         ) : null}
         <Text style={[type.small, { color: ink.faint }]}>Alerts reach you while the app is open or in the background. When the app is fully closed, nothing is sent yet.</Text>
       </Group>
+      ) : null}
 
       <Group title="Display and battery">
         <Toggle label="Bright light mode" value={prefs.brightMode} onChange={v => setPrefs({ brightMode: v })} note="Dark text on light during walks, for strong sunshine." />
@@ -102,7 +104,12 @@ export default function HomeSettings() {
         <Toggle label="Low-power mode" value={prefs.lowPower} onChange={v => setPrefs({ lowPower: v })} note="Turns off scenery and animation everywhere to save battery." />
       </Group>
 
-      <Group title="Account">
+      {guest ? (
+        <Group title="Account">
+          <Text style={type.body}>You’re exploring as a guest. Create a free account to walk with friends and keep your history.</Text>
+          <Button label="Sign in or create an account" icon="log-in-outline" onPress={() => router.push('/')} />
+        </Group>
+      ) : (      <Group title="Account">
         {confirmOut ? (
           <>
             <Text style={type.label}>Sign out of Spark Walk on this device?</Text>
@@ -115,6 +122,7 @@ export default function HomeSettings() {
           <Button label="Sign out" icon="log-out-outline" kind="danger" onPress={() => setConfirmOut(true)} />
         )}
       </Group>
+      )}
 
       <Text style={[type.small, { color: ink.faint, textAlign: 'center' }]}>
         Settings are saved on this device. Spark Walk doesn’t track your location.

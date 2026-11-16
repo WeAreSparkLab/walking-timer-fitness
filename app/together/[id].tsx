@@ -11,6 +11,7 @@ import {
   startTogether, pauseTogether, resumeTogether, setReady, leaveTogether, cancelTogether, markCompleted, subscribeTogether, getMessagesSince,
 } from '../../lib/api/together';
 import { sendMessage, subscribeMessages, Message } from '../../lib/api/messages';
+import { findPeople, Person } from '../../lib/api/people';
 import { listMyFriends, getFriendStatuses, sendFriendRequest, respondToFriendRequest, FriendState } from '../../lib/api/friends';
 import { sendNotificationToUser } from '../../lib/api/notifications';
 import { recordWalkActivity } from '../../lib/api/stats';
@@ -52,6 +53,10 @@ export default function TogetherScreen() {
   const [mine, setMine] = useState<{ pausedAt: number | null; total: number }>({ pausedAt: null, total: 0 });
   const [confirm, setConfirm] = useState<null | 'leave' | 'cancel'>(null);
   const [friendsOpen, setFriendsOpen] = useState(false);
+  const [peopleQuery, setPeopleQuery] = useState('');
+  const [peopleResults, setPeopleResults] = useState<Person[]>([]);
+  const [peopleNote, setPeopleNote] = useState<string | null>(null);
+  const [peopleBusy, setPeopleBusy] = useState(false);
   const [friends, setFriends] = useState<{ id: string; username: string }[]>([]);
   const [invited, setInvited] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
@@ -286,6 +291,17 @@ export default function TogetherScreen() {
     try { await respondToFriendRequest(fid, 'accepted'); setFriendStates(s => ({ ...s, [id]: { status: 'friends', friendshipId: fid } })); }
     catch { setNotice('Couldn’t accept the request. Please try again.'); }
   };
+  const searchPeople = async () => {
+    setPeopleBusy(true); setPeopleNote(null);
+    try {
+      const r = await findPeople(peopleQuery);
+      const found = r.people.filter(p => p.id !== me?.id);
+      setPeopleResults(found);
+      setPeopleNote(r.note ?? (found.length ? null : 'No one found. Check the spelling, or try their full email address.'));
+      if (found.length) getFriendStatuses(found.map(p => p.id)).then(s => setFriendStates(prev => ({ ...prev, ...s }))).catch(() => {});
+    } catch { setPeopleNote('Couldn’t search just now. Check your connection and try again.'); }
+    finally { setPeopleBusy(false); }
+  };
   const friendFor = (w: Walker) => (me && w.user_id !== me.id
     ? <FriendButton name={w.username || 'this walker'} state={friendStates[w.user_id]?.status ?? 'none'} onAdd={() => addFriend(w.user_id)} onAccept={() => acceptFriend(w.user_id)} />
     : null);
@@ -447,15 +463,43 @@ export default function TogetherScreen() {
                   <Button label="Copy" icon="copy-outline" kind="secondary" onPress={copyLink} disabled={!token} />
                 </View>
                 <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-                  <Button label="Invite friends" icon="people-outline" kind="secondary" style={{ flexGrow: 1 }} onPress={openFriends} />
+                  <Button label="Find and invite people" icon="people-outline" kind="secondary" style={{ flexGrow: 1 }} onPress={openFriends} />
                   <Button label="New link" icon="refresh" kind="quiet" onPress={newLink} />
                 </View>
-                {friendsOpen ? (friends.length ? friends.map(f => (
-                  <View key={f.id} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, gap: 10 }}>
-                    <Text style={[type.label, { flex: 1 }]}>{f.username}</Text>
-                    <Button label={invited[f.id] ? 'Invited' : 'Invite'} kind={invited[f.id] ? 'quiet' : 'secondary'} disabled={invited[f.id]} onPress={() => inviteFriend(f)} style={{ minHeight: 44 }} />
+                {friendsOpen ? (
+                  <View style={{ gap: 10 }}>
+                    <Text style={type.small}>Find anyone on Spark Walk by username, or by their full email address. Friends can be invited straight away. To invite someone new, send them a friend request first, or share the link above.</Text>
+                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                      <TextInput value={peopleQuery} onChangeText={setPeopleQuery} onSubmitEditing={searchPeople} autoCapitalize="none" autoCorrect={false}
+                        accessibilityLabel="Find a person by username or full email address" placeholder="Username or full email" placeholderTextColor={ink.faint}
+                        style={{ flex: 1, minHeight: 48, borderRadius: round.sm, borderWidth: 1, borderColor: ink.line, color: ink.text, paddingHorizontal: 12, fontSize: 16, backgroundColor: 'rgba(0,0,0,0.2)' }} />
+                      <Button label="Search" icon="search" kind="secondary" disabled={peopleBusy} onPress={searchPeople} style={{ minHeight: 48, paddingHorizontal: 14 }} />
+                    </View>
+                    {peopleNote ? <Text accessibilityLiveRegion="polite" style={type.small}>{peopleNote}</Text> : null}
+                    {peopleResults.map(p => {
+                      const st = friendStates[p.id]?.status ?? 'none';
+                      const name = p.username || 'New walker';
+                      return (
+                        <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, gap: 10 }}>
+                          <Text style={[type.label, { flex: 1 }]}>{name}</Text>
+                          {st === 'friends'
+                            ? <Button label={invited[p.id] ? 'Invited' : 'Invite'} kind={invited[p.id] ? 'quiet' : 'secondary'} disabled={invited[p.id]} onPress={() => inviteFriend({ id: p.id, username: name })} style={{ minHeight: 44 }} />
+                            : st === 'pending_sent' ? <Text style={type.small}>Friend request sent</Text>
+                            : st === 'pending_received' ? <Button label="Accept request" kind="secondary" onPress={() => acceptFriend(p.id)} style={{ minHeight: 44 }} />
+                            : <Button label="Add friend" kind="secondary" onPress={() => addFriend(p.id)} style={{ minHeight: 44 }} />}
+                        </View>
+                      );
+                    })}
+                    {friends.length ? <Text style={[type.eyebrow, { marginTop: 4 }]}>Your friends</Text> : null}
+                    {friends.map(f => (
+                      <View key={f.id} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, gap: 10 }}>
+                        <Text style={[type.label, { flex: 1 }]}>{f.username}</Text>
+                        <Button label={invited[f.id] ? 'Invited' : 'Invite'} kind={invited[f.id] ? 'quiet' : 'secondary'} disabled={invited[f.id]} onPress={() => inviteFriend(f)} style={{ minHeight: 44 }} />
+                      </View>
+                    ))}
+                    {!friends.length ? <Text style={type.small}>No friends yet. Search above to find someone, or share the link.</Text> : null}
                   </View>
-                )) : <Text style={type.small}>No friends yet. You can add them from Friends on the home screen.</Text>) : null}
+                ) : null}
               </Card>
             </>
           ) : null}

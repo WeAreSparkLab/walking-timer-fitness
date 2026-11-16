@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, pad, radius } from '../lib/theme';
 import { supabase } from '../lib/supabaseClient';
 import { sendFriendRequest, listMyFriends, listIncomingFriendRequests, respondToFriendRequest } from '../lib/api/friends';
+import { findPeople } from '../lib/api/people';
 import { useMyProfile } from '../lib/useMyProfile';
 import { notifyFriendRequest } from '../lib/webNotifications';
 
@@ -120,24 +121,9 @@ export default function Friends() {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('find_people', { p_query: q });
-      if (error && (error.code === 'PGRST202' || /find_people/i.test(error.message))) {
-        // The email search isn't switched on yet: fall back to usernames only.
-        const safe = q.replace(/[%_,()\\]/g, '');
-        const fallback = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url')
-          .ilike('username', `${safe}%`)
-          .neq('id', profile?.id ?? '')
-          .limit(20);
-        if (fallback.error) throw fallback.error;
-        setSearchResults(fallback.data || []);
-        if (q.includes('@')) setNotice({ kind: 'info', text: 'Searching by email isn’t available yet. Try their username.' });
-      } else if (error) {
-        throw error;
-      } else {
-        setSearchResults(data || []);
-      }
+      const res = await findPeople(q);
+      setSearchResults(res.people.filter(p => p.id !== profile?.id));
+      if (res.note) setNotice({ kind: 'info', text: res.note });
     } catch (error) {
       console.error('Search error:', error);
       setNotice({ kind: 'error', text: 'Couldn’t search just now. Check your connection and try again.' });
