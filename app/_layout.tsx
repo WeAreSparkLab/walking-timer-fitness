@@ -7,6 +7,7 @@ import { addNotificationResponseListener } from '../lib/notifications';
 import type { NotificationResponse } from 'expo-notifications';
 import '../lib/install'; // starts listening for the browser's install event right away
 import '../lib/recovery'; // sends password-reset email links to /reset-password
+import { useUnread } from '../lib/notify/counts';
 import { startAnalytics } from '../lib/analytics';
 import { Platform } from 'react-native';
 import { requestNotificationPermission } from '../lib/webNotifications';
@@ -17,6 +18,9 @@ export default function RootLayout() {
 
   // Cookie-free page views (private IDs redacted, see lib/analytics.ts)
   useEffect(() => { startAnalytics(); }, []);
+
+  // Counts what's waiting for you (friend requests, messages, invitations) and alerts you to new items.
+  useUnread();
 
   // Ensure web push subscription is created after permission is granted (one-time check)
   useEffect(() => {

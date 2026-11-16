@@ -16,7 +16,9 @@ import { sendNotificationToUser } from '../../lib/api/notifications';
 import { recordWalkActivity } from '../../lib/api/stats';
 import { syncServerClock, sharedElapsedMs, serverNow } from '../../lib/walk/sharedClock';
 import { PHASE_COPY, Segment, phaseAt, segmentsFromIntervals, totalSeconds, fmtClock, fmtMinutes } from '../../lib/walk/schedule';
-import { buzz, chime, speak, unlockAudio, createWakeLock } from '../../lib/walk/cues';
+import { buzz, chime, speak, unlockAudio, createWakeLock, ping } from '../../lib/walk/cues';
+import { showNotification, canShowNotifications } from '../../lib/webNotifications';
+import { Badge } from '../../components/spark/Badge';
 import { backgroundAudioSupported, scheduleCues, cancelScheduled, startKeepAlive, stopKeepAlive, setLockScreen, clearLockScreen } from '../../lib/walk/backgroundAudio';
 import { usePrefs } from '../../lib/spark/prefs';
 import { getWorld } from '../../lib/spark/worlds';
@@ -55,6 +57,8 @@ export default function TogetherScreen() {
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
+  const [toast, setToast] = useState<{ id: string; name: string; text: string } | null>(null);
+  const alerted = useRef<Set<string>>(new Set()); // messages we have already told you about (history is marked on load)
   const [walkersOpen, setWalkersOpen] = useState(false);
   const [friendStates, setFriendStates] = useState<Record<string, FriendState>>({});
   const [chatText, setChatText] = useState('');
@@ -123,7 +127,7 @@ export default function TogetherScreen() {
         return;
       }
       reloadWalkers();
-      getMessagesSince(sid, null).then(addMessages).catch(() => {});
+      getMessagesSince(sid, null).then(ms => { ms.forEach(m => alerted.current.add(m.id)); addMessages(ms); }).catch(() => {});
       const unsubMsgs = subscribeMessages(sid, m => addMessages([m]));
       const unsubTogether = subscribeTogether(sid, meNow, {
         session: s => setSession(prev => ({ ...(prev as TogetherSession), ...s })),
@@ -152,7 +156,12 @@ export default function TogetherScreen() {
   }, [me, error, started, finished, refresh]);
 
   // Opening the chat marks everything as read.
-  useEffect(() => { if (chatOpen) setChatSeen(new Date().toISOString()); }, [chatOpen, messages.length]);
+  // The chat counts as 'seen' whenever it is on screen: open during the walk, or always in the lobby and at the end.
+  const chatVisible = chatOpen || !started || finished;
+  useEffect(() => { if (chatVisible) setChatSeen(new Date().toISOString()); }, [chatVisible, messages.length]);
+
+  // Banner clears itself after a few seconds.
+  useEffect(() => { if (!toast) return; const h = setTimeout(() => setToast(null), 5000); return () => clearTimeout(h); }, [toast]);
 
   // Removed by host, or walk deleted.
   useEffect(() => {
@@ -283,6 +292,38 @@ export default function TogetherScreen() {
   // ---- chat ----
   const nameOf = (m: Message) => m.sender?.username || walkers.find(w => w.user_id === m.sender_id)?.username || 'Walker';
   const unread = messages.filter(m => m.sender_id !== me?.id && String(m.created_at) > chatSeen).length;
+  // New message from someone else: a soft ping, a short buzz and a banner (if the chat isn't already on
+  // screen); or a browser notification if the app is in the background. Switch off in Settings → Alerts.
+  useEffect(() => {
+    if (!me) return;
+    const fresh = messages.filter(m => m.sender_id !== me.id && !alerted.current.has(m.id));
+    if (!fresh.length) return;
+    fresh.forEach(m => alerted.current.add(m.id));
+    if (!prefs.alerts) return;
+    const m = fresh[fresh.length - 1];
+    const who = nameOf(m);
+    if (isVisible()) {
+      if (chatVisible) return;
+      ping(prefs.volume);
+      if (prefs.vibrate) { try { (navigator as any).vibrate?.(60); } catch {} }
+      setToast({ id: m.id, name: who, text: m.text });
+    } else if (canShowNotifications()) {
+      showNotification({ type: 'group_message', title: `${who} (group walk)`, body: m.text.length > 80 ? m.text.slice(0, 80) + '…' : m.text, url: `/together/${sid}` } as any);
+    }
+  }, [messages.length]);
+
+  const toastEl = toast ? (
+    <Pressable onPress={() => { setChatOpen(true); setToast(null); }} accessibilityRole="button" accessibilityLiveRegion="polite"
+      accessibilityLabel={`New message from ${toast.name}: ${toast.text}. Tap to open the chat.`}
+      style={{ position: 'absolute', top: 56, left: 16, right: 16, zIndex: 20, maxWidth: 560, alignSelf: 'center', flexDirection: 'row', gap: 10, alignItems: 'center', padding: 14, borderRadius: round.md, backgroundColor: ink.cardSolid, borderWidth: 1.5, borderColor: ink.ember }}>
+      <Ionicons name="chatbubble-ellipses" size={22} color={ink.ember} />
+      <View style={{ flex: 1 }}>
+        <Text style={[type.small, { color: ink.moss, fontWeight: '700' }]}>{toast.name}</Text>
+        <Text style={[type.body, { color: ink.text }]} numberOfLines={2}>{toast.text}</Text>
+      </View>
+    </Pressable>
+  ) : null;
+
   const send = async () => {
     const text = chatText.trim();
     if (!text) return;
@@ -347,6 +388,7 @@ export default function TogetherScreen() {
     const readyCount = walkers.filter(w => w.ready).length;
     return (
       <View style={{ flex: 1, backgroundColor: ink.bg }}>
+        {toastEl}
         {header}
         <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: 60, gap: space.lg, maxWidth: 600, width: '100%', alignSelf: 'center' }}>
           {showScene ? <View style={{ height: 150, borderRadius: round.lg, overflow: 'hidden' }}><Scenery world={world} still /></View> : null}
@@ -425,6 +467,7 @@ export default function TogetherScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: ink.bg }}>
+      {toastEl}
       {header}
       <ScrollView contentContainerStyle={{ paddingHorizontal: space.md, paddingBottom: 40, maxWidth: 560, width: '100%', alignSelf: 'center' }}>
         {showScene ? (
@@ -492,7 +535,10 @@ export default function TogetherScreen() {
               : <Button label="Pause just me" icon="pause-outline" kind="secondary" onPress={() => setMine(m => ({ ...m, pausedAt: serverNow() }))} a11yHint="Others keep walking. You can catch up any time." />
           ) : null}
           {meStepped && !groupPaused ? <Text style={[type.small, { textAlign: 'center' }]}>Others are still walking. Catching up takes you to where they are now.</Text> : null}
-          <Button label={unread ? `Chat (${unread} new)` : 'Chat'} icon="chatbubbles-outline" kind="secondary" onPress={() => setChatOpen(o => !o)} a11yHint="Messages stay quiet while you walk" />
+          <View>
+            <Button label="Chat" icon="chatbubbles-outline" kind="secondary" onPress={() => setChatOpen(o => !o)} a11yHint="Messages stay quiet while you walk" />
+            <Badge count={unread} style={{ position: 'absolute', top: -8, right: -6 }} label={` new message${unread === 1 ? '' : 's'}`} />
+          </View>
           {chatOpen ? <Card style={{ gap: 10 }}>{chat}</Card> : null}
           {notice ? <Text accessibilityLiveRegion="polite" style={[type.small, { color: ink.ember }]}>{notice}</Text> : null}
           <LeaveOrCancel isHost={isHost} confirm={confirm} setConfirm={setConfirm} walking

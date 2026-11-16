@@ -9,6 +9,7 @@ export type Prefs = {
   lowPower: boolean;     // disables scene animation everywhere
   scene3d: boolean;      // 3D worlds on web (falls back to 2D automatically)
   walkScene: boolean;    // moving world on the active walk screen
+  alerts: boolean;       // sound + banner for friend requests, invitations and chat while the app is open
   voice: boolean;        // spoken announcements
   chime: boolean;        // soft tone at each change
   vibrate: boolean;
@@ -18,7 +19,7 @@ export type Prefs = {
 };
 
 export const DEFAULT_PREFS: Prefs = {
-  world: 'woodland', lowPower: false, scene3d: true, walkScene: true, voice: true, chime: true, vibrate: true,
+  world: 'woodland', lowPower: false, scene3d: true, walkScene: true, alerts: true, voice: true, chime: true, vibrate: true,
   volume: 0.7, brightMode: false, keepAwake: true,
 };
 

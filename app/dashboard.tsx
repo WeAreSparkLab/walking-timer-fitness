@@ -12,6 +12,8 @@ import { deleteSession, leaveSession } from '../lib/api/sessions';
 import { PENDING_JOIN_KEY } from '../lib/api/together';
 import { useMyProfile } from '../lib/useMyProfile';
 import { ensureMyProfile } from '../lib/api/profile';
+import { useUnread } from '../lib/notify/counts';
+import { Badge } from '../components/spark/Badge';
 import { loadActiveWalk, ActiveWalk, elapsedMs } from '../lib/walk/engine';
 import { PRESETS, buildSegments, segmentsFromIntervals, totalSeconds, fmtMinutes, fmtClock } from '../lib/walk/schedule';
 import { usePrefs, prefersReducedMotion } from '../lib/spark/prefs';
@@ -39,6 +41,7 @@ export default function Dashboard() {
   useSparkFonts();
   const router = useRouter();
   const { username, avatarUrl } = useMyProfile();
+  const unread = useUnread();
   const [prefs, setPrefs] = usePrefs();
   const [authChecked, setAuthChecked] = useState(false);
   const [plans, setPlans] = useState<WalkPlan[]>([]);
@@ -133,10 +136,14 @@ export default function Dashboard() {
             <Ionicons name="sparkles" size={16} color={ink.ember} />
             <Text style={[type.label, { fontSize: 15 }]}>Spark Walk</Text>
           </View>
-          <Pressable onPress={() => router.push('/profile')} accessibilityRole="button" accessibilityLabel="Your profile and settings"
-            style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden', backgroundColor: 'rgba(13,19,16,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(246,241,231,0.5)' }}>
-            {avatarUrl ? <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44 }} /> : <Ionicons name="person" size={22} color={ink.text} />}
-          </Pressable>
+          <View style={{ width: 48, height: 48 }}>
+            <Pressable onPress={() => router.push(unread.total > 0 ? '/notifications' : '/profile')} accessibilityRole="button"
+              accessibilityLabel={unread.total > 0 ? `Your profile. ${unread.total} new notification${unread.total === 1 ? '' : 's'}. Tap to see them.` : 'Your profile'}
+              style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden', backgroundColor: 'rgba(13,19,16,0.5)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(246,241,231,0.5)' }}>
+              {avatarUrl ? <Image source={{ uri: avatarUrl }} style={{ width: 44, height: 44 }} /> : <Ionicons name="person" size={22} color={ink.text} />}
+            </Pressable>
+            <Badge count={unread.total} style={{ position: 'absolute', top: -6, right: -6 }} />
+          </View>
         </View>
         <View style={wrap({ paddingHorizontal: space.md, paddingBottom: 8 })}>
           <Text style={[type.small, { color: ink.text, opacity: 0.85 }]}>{hello}{username ? `, ${username}` : ''}</Text>
@@ -188,9 +195,27 @@ export default function Dashboard() {
           </Card>
         ) : null}
 
+        {/* What's new */}
+        {unread.total > 0 ? (
+          <Card onPress={() => router.push('/notifications')} label={`${unread.total} new. See what's new.`}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderColor: 'rgba(255,92,77,0.55)', backgroundColor: 'rgba(255,92,77,0.08)' }}>
+            <Badge count={unread.total} style={{ borderColor: ink.cardSolid }} />
+            <View style={{ flex: 1 }}>
+              <Text style={type.label}>{unread.total === 1 ? 'You have 1 new notification' : `You have ${unread.total} new notifications`}</Text>
+              <Text style={type.small}>
+                {[unread.friendRequests ? `${unread.friendRequests} friend request${unread.friendRequests === 1 ? '' : 's'}` : '', unread.messages ? `${unread.messages} message${unread.messages === 1 ? '' : 's'}` : '', unread.updates ? `${unread.updates} update${unread.updates === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={ink.sub} />
+          </Card>
+        ) : null}
+
         {/* Shortcuts */}
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Button label="Friends" icon="heart-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/friends')} />
+          <View style={{ flex: 1 }}>
+            <Button label="Friends" icon="heart-outline" kind="secondary" style={{ paddingHorizontal: 10 }} onPress={() => router.push('/friends')} />
+            <Badge count={unread.friendRequests + unread.messages} style={{ position: 'absolute', top: -6, right: -4 }} label={`${unread.friendRequests + unread.messages} new in friends`} />
+          </View>
           <Button label="Profile" icon="person-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/profile')} />
         </View>
 
