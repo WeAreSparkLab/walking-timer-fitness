@@ -332,13 +332,9 @@ export default function Friends() {
               </View>
             ) : (
               searchResults
-                .filter(user => {
-                  // Filter out existing friends
-                  const isFriend = friends.some(f => f.id === user.id);
-                  return !isFriend;
-                })
                 .map((user) => {
-                  const isPending = sentRequests.has(user.id);
+                  const isFriend = friends.some(f => f.id === user.id);
+                  const isPending = !isFriend && sentRequests.has(user.id);
                   return (
                     <TouchableOpacity 
                       key={user.id} 
@@ -358,18 +354,20 @@ export default function Friends() {
                       <View style={styles.userInfo}>
                         <Text style={styles.userName}>{user.username || 'User'}</Text>
                         {isPending && <Text style={styles.pendingText}>Request sent. Tap ⏳ to send again</Text>}
-                        {!isPending && <Text style={styles.userEmail}>Tap to view profile</Text>}
+                        {isFriend && <Text style={styles.pendingText}>Already your friend</Text>}
+                        {!isPending && !isFriend && <Text style={styles.userEmail}>Tap to view profile</Text>}
                       </View>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         onPress={(e) => {
                           e.stopPropagation();
-                          handleAddFriend(user.id);
+                          if (isFriend) router.push({ pathname: '/chat/[friendId]', params: { friendId: user.id, friendName: user.username || 'User' } } as any);
+                          else handleAddFriend(user.id);
                         }}
                         style={styles.addBtn}
                         accessibilityRole="button"
-                        accessibilityLabel={isPending ? 'Send the request again' : 'Send friend request'}
+                        accessibilityLabel={isFriend ? `Chat with ${user.username || 'this friend'}` : isPending ? 'Send the request again' : 'Send friend request'}
                       >
-                        <Text style={styles.addIcon}>{isPending ? '⏳' : '+'}</Text>
+                        <Text style={styles.addIcon}>{isFriend ? '💬' : isPending ? '⏳' : '+'}</Text>
                       </TouchableOpacity>
                     </TouchableOpacity>
                   );
