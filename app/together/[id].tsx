@@ -58,6 +58,7 @@ export default function TogetherScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [toast, setToast] = useState<{ id: string; name: string; text: string } | null>(null);
+  const lastPush = useRef<Record<string, number>>({});
   const alerted = useRef<Set<string>>(new Set()); // messages we have already told you about (history is marked on load)
   const [walkersOpen, setWalkersOpen] = useState(false);
   const [friendStates, setFriendStates] = useState<Record<string, FriendState>>({});
@@ -259,7 +260,7 @@ export default function TogetherScreen() {
     if (!token) return;
     setInvited(m => ({ ...m, [f.id]: true }));
     const ok = await sendNotificationToUser(f.id, 'Walk invitation', `${me?.username || 'A friend'} invited you to “${session?.name || 'a walk'}”`,
-      { type: 'walk_invite', session_id: sid, session_name: session?.name, host_name: me?.username, link: inviteLink(token), token });
+      { type: 'walk_invite', session_id: sid, session_name: session?.name, host_name: me?.username, link: inviteLink(token), token, url: `/join/${token}` });
     if (!ok) setNotice(`Couldn’t notify ${f.username}. You can share the link instead.`);
   };
 
@@ -328,8 +329,17 @@ export default function TogetherScreen() {
     const text = chatText.trim();
     if (!text) return;
     setChatText('');
-    try { addMessages([await sendMessage(sid, text)]); }
-    catch { setChatText(text); setNotice('Couldn’t send your message. Check your connection.'); }
+    try {
+      addMessages([await sendMessage(sid, text)]);
+      // Nudge walkers who aren't looking at the walk right now, at most once a minute each.
+      const t = Date.now();
+      walkers.filter(w => w.user_id !== me?.id && !online.includes(w.user_id)).forEach(w => {
+        if (t - (lastPush.current[w.user_id] ?? 0) < 60000) return;
+        lastPush.current[w.user_id] = t;
+        sendNotificationToUser(w.user_id, `${me?.username || 'Someone'} (group walk)`, text.length > 80 ? text.slice(0, 80) + '…' : text,
+          { type: 'group_message', session_id: sid, url: `/together/${sid}` });
+      });
+    } catch { setChatText(text); setNotice('Couldn’t send your message. Check your connection.'); }
   };
   const chat = <ChatPanel messages={messages} meId={me?.id ?? ''} nameOf={nameOf} text={chatText} setText={setChatText} onSend={send} />;
 

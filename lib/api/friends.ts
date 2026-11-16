@@ -29,12 +29,12 @@ export async function sendFriendRequest(addresseeId: string) {
     .single();
 
   // Send push notification to addressee via Edge Function
-  if (profile?.username) {
+  {
     await sendNotificationToUser(
       addresseeId,
       'Friend request',
-      `${profile.username} wants to be your friend!`,
-      { type: 'friend_request', requester_id: user.id, requester_name: profile.username }
+      `${(profile?.username || 'Someone')} wants to be your friend!`,
+      { type: 'friend_request', url: '/notifications', requester_id: user.id, requester_name: (profile?.username || 'Someone') }
     );
   }
 
@@ -61,12 +61,12 @@ export async function respondToFriendRequest(friendshipId: string, status: 'acce
       .eq('id', user.id)
       .single();
 
-    if (profile?.username) {
+    {
       await sendNotificationToUser(
         data.requester_id,
         'Friend request accepted',
-        `${profile.username} accepted your friend request!`,
-        { type: 'friend_accepted', friend_id: user.id, friend_name: profile.username }
+        `${(profile?.username || 'Someone')} accepted your friend request!`,
+        { type: 'friend_accepted', url: '/notifications', friend_id: user.id, friend_name: (profile?.username || 'Someone') }
       );
     }
   }

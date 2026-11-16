@@ -84,7 +84,9 @@ self.addEventListener('notificationclick', (event) => {
   let urlToOpen = 'https://walks.wearesparklab.com/dashboard';
   
   // Build URL based on notification type
-  if (data.type === 'walk_invite' && data.session_id) {
+  if (typeof data.url === 'string' && data.url.startsWith('/')) {
+    urlToOpen = 'https://walks.wearesparklab.com' + data.url;
+  } else if (data.type === 'walk_invite' && data.session_id) {
     urlToOpen = `https://walks.wearesparklab.com/walk-timer?sessionId=${data.session_id}`;
   } else if (data.type === 'session_invite' && data.link) {
     urlToOpen = data.link;
