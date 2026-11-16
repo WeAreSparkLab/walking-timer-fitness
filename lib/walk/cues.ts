@@ -110,3 +110,19 @@ export function createWakeLock(onChange: (held: boolean) => void) {
     },
   };
 }
+
+/** A soft two-note "ping" for messages and requests. Quieter and shorter than the pace chimes. */
+export function ping(volume: number) {
+  if (Platform.OS !== 'web' || !ctx || volume <= 0) return;
+  try { tone(988, 0, 0.12, volume * 0.8); tone(1319, 0.13, 0.22, volume * 0.8); } catch {}
+}
+
+let unlockInstalled = false;
+/** Browsers only allow sound after a tap, so unlock audio on the first tap anywhere in the app. */
+export function installAudioUnlock() {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || unlockInstalled) return;
+  unlockInstalled = true;
+  const once = () => { unlockAudio(); window.removeEventListener('pointerdown', once); window.removeEventListener('keydown', once); };
+  window.addEventListener('pointerdown', once);
+  window.addEventListener('keydown', once);
+}

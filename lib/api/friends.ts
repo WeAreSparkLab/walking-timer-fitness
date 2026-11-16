@@ -32,7 +32,7 @@ export async function sendFriendRequest(addresseeId: string) {
   if (profile?.username) {
     await sendNotificationToUser(
       addresseeId,
-      '👋 Friend Request',
+      'Friend request',
       `${profile.username} wants to be your friend!`,
       { type: 'friend_request', requester_id: user.id, requester_name: profile.username }
     );
@@ -64,7 +64,7 @@ export async function respondToFriendRequest(friendshipId: string, status: 'acce
     if (profile?.username) {
       await sendNotificationToUser(
         data.requester_id,
-        '🎉 Friend Request Accepted',
+        'Friend request accepted',
         `${profile.username} accepted your friend request!`,
         { type: 'friend_accepted', friend_id: user.id, friend_name: profile.username }
       );
@@ -243,4 +243,11 @@ export async function getFriendStatuses(otherIds: string[]): Promise<Record<stri
     else if (f.status === 'pending') out[other] = { status: f.requester_id === user.id ? 'pending_sent' : 'pending_received', friendshipId: f.id };
   }
   return out;
+}
+/** Say no to a request someone sent you (removes it, without telling them). */
+export async function declineFriendRequest(friendshipId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const { error } = await supabase.from('friendships').delete().eq('id', friendshipId).eq('addressee_id', user.id).eq('status', 'pending');
+  if (error) throw error;
 }

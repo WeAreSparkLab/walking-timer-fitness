@@ -41,14 +41,32 @@ export async function sendNotificationToUser(
 
     if (!response.ok) {
       console.error('Failed to send notification:', await response.text());
-      return false;
+      return await inAppFallback(userId, title, body, data);
     }
 
     return true;
   } catch (error) {
     console.error('Error sending notification:', error);
-    return false;
+    return await inAppFallback(userId, title, body, data);
   }
+}
+
+/**
+ * If the notification function isn't reachable, still leave an in-app notification for the
+ * kinds that show in the badge (walk invitations and accepted friend requests). Friend requests
+ * themselves are counted straight from the friendships table, so they need no row.
+ */
+async function inAppFallback(userId: string, title: string, body: string, data?: any): Promise<boolean> {
+  const type = data?.type;
+  if (type !== 'walk_invite' && type !== 'friend_accepted') return false;
+  // Preferred: the database function that only lets friends notify each other (supabase/proposed/notify_friend.sql).
+  const { error } = await supabase.rpc('notify_friend', { p_user: userId, p_type: type, p_title: title, p_message: body, p_data: data ?? {} });
+  if (!error) return true;
+  // Not installed yet: fall back to a direct insert (allowed by the current, more open, rule).
+  if (error.code === 'PGRST202' || /notify_friend/i.test(error.message)) {
+    try { await createNotification(userId, type, title, body, data); return true; } catch { return false; }
+  }
+  return false;
 }
 
 /**

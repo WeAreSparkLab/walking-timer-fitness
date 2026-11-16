@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { usePrefs } from '../../lib/spark/prefs';
 import { capabilities, chime, speak, unlockAudio } from '../../lib/walk/cues';
 import { useInstall, manualSteps } from '../../lib/install';
+import { requestNotificationPermission } from '../../lib/webNotifications';
 import { ink, phaseTone, round, space } from '../../lib/spark/tokens';
 import { Button, Card, Toggle, type } from './ui';
 
@@ -17,6 +18,7 @@ export default function HomeSettings() {
   const { kind, install } = useInstall();
   const [confirmOut, setConfirmOut] = useState(false);
   const [installMsg, setInstallMsg] = useState<string | null>(null);
+  const [perm, setPerm] = useState<string>(typeof window !== 'undefined' && 'Notification' in window ? (Notification as any).permission : 'default');
   const vol = Math.round(prefs.volume * 100);
 
   const testSound = () => {
@@ -72,6 +74,22 @@ export default function HomeSettings() {
           <Button label="Louder" kind="secondary" icon="add" style={{ minHeight: 48, paddingHorizontal: 12 }} onPress={() => setPrefs({ volume: Math.min(1, +(prefs.volume + 0.1).toFixed(1)) })} />
         </View>
         <Button label="Test sound" icon="volume-medium-outline" kind="secondary" onPress={testSound} />
+      </Group>
+
+      <Group title="Alerts">
+        <Toggle label="Friend, invitation and chat alerts" value={prefs.alerts} onChange={v => setPrefs({ alerts: v })}
+          note="A soft sound, a short buzz and a banner when something new arrives while Spark Walk is open." />
+        {typeof window !== 'undefined' && 'Notification' in window ? (
+          perm === 'granted' ? (
+            <Text style={type.small}>Notifications are on. You’ll also see them when Spark Walk is in the background.</Text>
+          ) : perm === 'denied' ? (
+            <Text style={type.small}>Notifications are blocked in your browser settings. You can allow them there for this site.</Text>
+          ) : (
+            <Button label="Allow notifications" icon="notifications-outline" kind="secondary"
+              onPress={async () => { await requestNotificationPermission(); setPerm((Notification as any).permission); }} />
+          )
+        ) : null}
+        <Text style={[type.small, { color: ink.faint }]}>Alerts reach you while the app is open or in the background. When the app is fully closed, nothing is sent yet.</Text>
       </Group>
 
       <Group title="Display and battery">
