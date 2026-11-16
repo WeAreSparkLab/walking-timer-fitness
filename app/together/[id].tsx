@@ -400,7 +400,7 @@ export default function TogetherScreen() {
             {walkers.map(w => <WalkerRow key={w.user_id} w={w} host={w.user_id === session.host_id} you={w.user_id === me.id} friend={friendFor(w)} />)}
           </Card>
           <Card style={{ gap: 10 }}>
-            <Text style={type.label}>Say thanks</Text>
+            <Text style={type.label}>Group chat</Text>
             {chat}
           </Card>
           <Button label="Back to home" onPress={() => router.replace('/dashboard')} />
