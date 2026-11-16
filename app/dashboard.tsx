@@ -236,7 +236,11 @@ export default function Dashboard() {
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <View style={{ flex: 1 }}>
             <Button label="Friends" icon="heart-outline" kind="secondary" style={{ paddingHorizontal: 10 }} onPress={() => router.push('/friends')} />
-            <Badge count={unread.friendRequests + unread.messages} style={{ position: 'absolute', top: -6, right: -4 }} label={`${unread.friendRequests + unread.messages} new in friends`} />
+            <Badge count={unread.friendRequests} style={{ position: 'absolute', top: -6, right: -4 }} label={`${unread.friendRequests} friend requests`} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button label="Messages" icon="chatbubbles-outline" kind="secondary" style={{ paddingHorizontal: 10 }} onPress={() => router.push('/messages')} />
+            <Badge count={unread.messages} style={{ position: 'absolute', top: -6, right: -4 }} label={`${unread.messages} unread messages`} />
           </View>
           <Button label="Profile" icon="person-outline" kind="secondary" style={{ flex: 1, paddingHorizontal: 10 }} onPress={() => router.push('/profile')} />
         </View>
